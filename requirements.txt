@@ -1,0 +1,6 @@
+requests
+python-dotenv
+openai
+pillow
+uiautomator2
+imageio-ffmpeg
