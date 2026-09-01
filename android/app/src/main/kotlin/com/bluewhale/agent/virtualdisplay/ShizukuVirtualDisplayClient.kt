@@ -1,10 +1,12 @@
 package com.bluewhale.agent.virtualdisplay
 
+import android.annotation.SuppressLint
 import android.hardware.display.IVirtualDisplayCallback
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import android.view.Surface
+import com.bluewhale.agent.BuildConfig
 import java.lang.reflect.InvocationTargetException
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
@@ -13,6 +15,7 @@ import rikka.shizuku.Shizuku
 import rikka.shizuku.ShizukuBinderWrapper
 import rikka.shizuku.SystemServiceHelper
 
+@SuppressLint("PrivateApi")
 class ShizukuVirtualDisplayClient {
     companion object {
         private const val TAG = "BluewhaleShizuku"
@@ -26,6 +29,9 @@ class ShizukuVirtualDisplayClient {
     @Volatile
     private var cachedDisplayProxy: Any? = null
 
+    @Volatile
+    private var cachedActivityTaskProxy: Any? = null
+
     fun isAvailable(): Boolean =
         runCatching { Shizuku.pingBinder() }.getOrDefault(false)
 
@@ -35,9 +41,7 @@ class ShizukuVirtualDisplayClient {
         }.getOrDefault(false)
 
     fun bypassHiddenApis() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            HiddenApiBypass.addHiddenApiExemptions("")
-        }
+        HiddenApiBypass.addHiddenApiExemptions("")
     }
 
     fun createVirtualDisplay(
@@ -81,22 +85,151 @@ class ShizukuVirtualDisplayClient {
         }
     }
 
+    fun setVirtualDisplaySurface(displayId: Int, surface: Surface): Boolean {
+        if (displayId < 0) return false
+        return try {
+            val callback = displayCallbacks[displayId] ?: return false
+            val proxy = displayManagerProxy()
+            val method =
+                proxy.javaClass.getMethod(
+                    "setVirtualDisplaySurface",
+                    IVirtualDisplayCallback::class.java,
+                    Surface::class.java,
+                )
+            method.invoke(proxy, callback, surface)
+            Log.d(TAG, "Rebound surface for virtual display $displayId")
+            true
+        } catch (error: Exception) {
+            Log.e(TAG, "Failed to rebind surface for virtual display $displayId", error)
+            false
+        }
+    }
+
+    fun removeRootTasksOnDisplay(displayId: Int): Int {
+        if (displayId < 0) return -1
+        return try {
+            val proxy = activityTaskManagerProxy()
+            val getAllMethod =
+                proxy.javaClass.getMethod(
+                    "getAllRootTaskInfosOnDisplay",
+                    Int::class.javaPrimitiveType,
+                )
+            val rootTaskInfos =
+                getAllMethod.invoke(proxy, displayId) as? List<*>
+                    ?: emptyList<Any>()
+            val removeMethod =
+                proxy.javaClass.getMethod(
+                    "removeTask",
+                    Int::class.javaPrimitiveType,
+                )
+            var removed = 0
+            rootTaskInfos.forEach { info ->
+                val taskId =
+                    info?.let { target ->
+                        runCatching {
+                            target.javaClass.getField("taskId").getInt(target)
+                        }.getOrDefault(-1)
+                    } ?: -1
+                if (taskId >= 0 && removeMethod.invoke(proxy, taskId) as? Boolean == true) {
+                    removed++
+                }
+            }
+            Log.i(TAG, "Removed $removed root task(s) from virtual display $displayId")
+            removed
+        } catch (error: Exception) {
+            Log.w(TAG, "Failed to remove root tasks from virtual display $displayId", error)
+            -1
+        }
+    }
+
+    /**
+     * Move the currently visible root task from a virtual display to the physical display.
+     * The operation preserves the task's page state, unlike launching the package again.
+     */
+    fun moveVisibleRootTaskToDisplay(
+        fromDisplayId: Int,
+        toDisplayId: Int,
+    ): Int {
+        if (fromDisplayId < 0 || toDisplayId < 0) return -1
+        return try {
+            val proxy = activityTaskManagerProxy()
+            val getAllMethod =
+                proxy.javaClass.getMethod(
+                    "getAllRootTaskInfosOnDisplay",
+                    Int::class.javaPrimitiveType,
+                )
+            val rootTaskInfos =
+                getAllMethod.invoke(proxy, fromDisplayId) as? List<*>
+                    ?: emptyList<Any>()
+            val candidates =
+                rootTaskInfos.mapNotNull { info ->
+                    info?.let { target ->
+                        val taskId =
+                            runCatching {
+                                target.javaClass.getField("taskId").getInt(target)
+                            }.getOrDefault(-1)
+                        val visible =
+                            runCatching {
+                                target.javaClass.getField("isVisible").getBoolean(target)
+                            }.getOrDefault(false)
+                        val topActivity =
+                            runCatching {
+                                target.javaClass.getField("topActivity").get(target)?.toString()
+                            }.getOrNull()
+                        RootTaskCandidate(taskId, visible, topActivity)
+                    }
+                }.filter { it.taskId >= 0 }
+            val selected =
+                candidates.firstOrNull { it.visible && it.topActivity != null }
+                    ?: candidates.firstOrNull { it.topActivity != null }
+                    ?: candidates.firstOrNull()
+                    ?: return 0
+            val moveMethod =
+                proxy.javaClass.getMethod(
+                    "moveRootTaskToDisplay",
+                    Int::class.javaPrimitiveType,
+                    Int::class.javaPrimitiveType,
+                )
+            moveMethod.invoke(proxy, selected.taskId, toDisplayId)
+            Log.i(
+                TAG,
+                "Moved root task ${selected.taskId} (${selected.topActivity}) " +
+                    "from display $fromDisplayId to $toDisplayId",
+            )
+            1
+        } catch (error: Exception) {
+            Log.e(
+                TAG,
+                "Failed to move visible root task from display $fromDisplayId to $toDisplayId",
+                error,
+            )
+            -1
+        }
+    }
+
     fun executeShellCommand(command: Array<String>): Int {
+        val commandForLog =
+            if (BuildConfig.DEBUG) {
+                command.joinToString(" ")
+            } else {
+                "${command.firstOrNull().orEmpty()} <redacted-args:${(command.size - 1).coerceAtLeast(0)}>"
+            }
         return try {
             val process = newProcessViaShizuku(command)
             if (!waitForProcess(process, 30, TimeUnit.SECONDS)) {
                 process.destroy()
-                Log.e(TAG, "Shell command timed out: ${command.joinToString(" ")}")
+                Log.e(TAG, "Shell command timed out: $commandForLog")
                 return -1
             }
             val exitCode = process.exitValue()
             if (exitCode != 0) {
                 val error = process.errorStream.bufferedReader().use { it.readText() }
-                Log.w(TAG, "Shell command failed ($exitCode): ${command.joinToString(" ")}\n$error")
+                val safeError = if (BuildConfig.DEBUG) error else "<redacted:${error.length}>"
+                Log.w(TAG, "Shell command failed ($exitCode): $commandForLog\n$safeError")
             }
             exitCode
         } catch (error: Exception) {
-            Log.e(TAG, "Failed to execute shell command: ${command.joinToString(" ")}", error)
+            Log.e(TAG, "Failed to execute shell command: $commandForLog", error)
             -1
         }
     }
@@ -104,6 +237,7 @@ class ShizukuVirtualDisplayClient {
     fun clear() {
         displayCallbacks.clear()
         cachedDisplayProxy = null
+        cachedActivityTaskProxy = null
     }
 
     private fun createVirtualDisplayApi33(
@@ -278,6 +412,20 @@ class ShizukuVirtualDisplayClient {
         throw lastError ?: IllegalStateException("createVirtualDisplay legacy-alt failed")
     }
 
+    private fun activityTaskManagerProxy(): Any {
+        cachedActivityTaskProxy?.let { return it }
+        val binder =
+            SystemServiceHelper.getSystemService("activity_task")
+                ?: throw IllegalStateException("Cannot obtain activity_task service binder")
+        val wrapped = ShizukuBinderWrapper(binder)
+        val stubClass = Class.forName("android.app.IActivityTaskManager\$Stub")
+        val proxy =
+            stubClass.getMethod("asInterface", IBinder::class.java).invoke(null, wrapped)
+                ?: throw IllegalStateException("IActivityTaskManager.asInterface returned null")
+        cachedActivityTaskProxy = proxy
+        return proxy
+    }
+
     private fun displayManagerProxy(): Any {
         cachedDisplayProxy?.let { return it }
         val binder =
@@ -369,4 +517,10 @@ class ShizukuVirtualDisplayClient {
         method.isAccessible = true
         return method.invoke(null, command, null, null) as Process
     }
+
+    private data class RootTaskCandidate(
+        val taskId: Int,
+        val visible: Boolean,
+        val topActivity: String?,
+    )
 }

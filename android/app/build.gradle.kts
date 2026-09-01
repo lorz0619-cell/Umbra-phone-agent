@@ -1,8 +1,29 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
 }
+
+val localProperties =
+    Properties().apply {
+        val propertiesFile = rootProject.file("local.properties")
+        if (propertiesFile.exists()) {
+            propertiesFile.inputStream().use { load(it) }
+        }
+    }
+val bundledApiKey = localProperties.getProperty("umbra.apiKey", "")
+val releaseSigningPropertiesFile = rootProject.file("../.release-secrets/keystore.properties")
+val releaseSigningProperties =
+    Properties().apply {
+        if (releaseSigningPropertiesFile.exists()) {
+            releaseSigningPropertiesFile.inputStream().use { load(it) }
+        }
+    }
+val releaseSigningConfigured =
+    listOf("storeFile", "storePassword", "keyAlias", "keyPassword")
+        .all { !releaseSigningProperties.getProperty(it).isNullOrBlank() }
 
 android {
     namespace = "com.bluewhale.agent"
@@ -12,14 +33,34 @@ android {
         applicationId = "com.bluewhale.agent"
         minSdk = 31
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 14
+        versionName = "2.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        if (releaseSigningConfigured) {
+            create("release") {
+                storeFile = file(releaseSigningProperties.getProperty("storeFile"))
+                storePassword = releaseSigningProperties.getProperty("storePassword")
+                keyAlias = releaseSigningProperties.getProperty("keyAlias")
+                keyPassword = releaseSigningProperties.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
+        debug {
+            // Personal convenience only. android/local.properties is ignored by Git.
+            buildConfigField("String", "DEFAULT_API_KEY", "\"$bundledApiKey\"")
+        }
         release {
+            // Public artifacts must never inherit a developer's local API key.
+            buildConfigField("String", "DEFAULT_API_KEY", "\"\"")
+            if (releaseSigningConfigured) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -74,5 +115,13 @@ dependencies {
     implementation("dev.rikka.shizuku:provider:13.1.5")
     implementation("org.lsposed.hiddenapibypass:hiddenapibypass:6.1")
 
+    // Apache-2.0 offline speech recognition. The Chinese model is downloaded
+    // from the official Vosk model host on first use to keep the APK compact.
+    implementation("com.alphacephei:vosk-android:0.3.75@aar")
+    implementation("net.java.dev.jna:jna:5.18.1@aar")
+
     debugImplementation("androidx.compose.ui:ui-tooling")
+
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303")
 }

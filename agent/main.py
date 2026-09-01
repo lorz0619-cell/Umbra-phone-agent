@@ -20,7 +20,7 @@ from .execution import (
     VirtualDisplayBackend,
     create_backend,
 )
-from .llm import AutoGlmVisionClient
+from .llm import GenericVisionClient
 from .router import TaskRequest, route_command
 from .utils.adb import AdbController
 from .utils.scrcpy import DEFAULT_SCRCPY, VirtualDisplaySession
@@ -245,7 +245,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--source",
         choices=["main", "virtual", "screenshot"],
         default="screenshot",
-        help="Which screen to capture before asking AutoGLM",
+        help="Which screen to capture before asking the configured VLM",
     )
     vlm_parser.add_argument("--screenshot", default="artifacts/gui_search.png")
     vlm_parser.add_argument("--command", required=True)
@@ -417,7 +417,7 @@ def main() -> int:
                 backend_ctx.__enter__()
                 backend_ctx.screencap(source_path)
 
-            client = AutoGlmVisionClient()
+            client = GenericVisionClient()
             result = client.analyze_screenshot(source_path, args.command)
         except Exception as exc:
             print(exc, file=sys.stderr)
@@ -439,7 +439,7 @@ def main() -> int:
             backend.__enter__()
             if args.url:
                 backend.open_url(args.url)
-            client = AutoGlmVisionClient()
+            client = GenericVisionClient()
             for step in range(args.max_steps):
                 shot = Path(f"artifacts/vlm_step_{step + 1}.png")
                 backend.screencap(shot)

@@ -65,6 +65,10 @@ object TextNodeSupport {
         return null
     }
 
+    fun pasteText(node: AccessibilityNodeInfo): Boolean {
+        return node.performAction(AccessibilityNodeInfo.ACTION_PASTE)
+    }
+
     fun writeText(node: AccessibilityNodeInfo, text: String): Boolean {
         val arguments =
             Bundle().apply {
@@ -85,6 +89,13 @@ object TextNodeSupport {
         )
         return true
     }
+
+    fun clearInputFocus(node: AccessibilityNodeInfo) {
+        runCatching {
+            node.performAction(AccessibilityNodeInfo.ACTION_CLEAR_FOCUS)
+        }
+    }
+
     fun containsText(node: AccessibilityNodeInfo, text: String): Boolean {
         if (!node.refresh()) return false
         val actual = node.text?.toString() ?: ""

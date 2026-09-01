@@ -1,4 +1,4 @@
-"""Parse and execute actions returned by AutoGLM."""
+"""Parse and execute actions returned by the legacy Python VLM prototype."""
 
 from __future__ import annotations
 

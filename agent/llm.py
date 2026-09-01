@@ -1,4 +1,4 @@
-"""AutoGLM vision-language model client."""
+"""Provider-neutral OpenAI-compatible vision-language model client."""
 
 from __future__ import annotations
 
@@ -11,8 +11,8 @@ from openai import OpenAI
 from .config import get_env
 
 
-class AutoGlmVisionClient:
-    """Thin OpenAI-compatible client for the AutoGLM phone model."""
+class GenericVisionClient:
+    """Thin client for a configurable multimodal chat-completions model."""
 
     def __init__(
         self,
@@ -20,14 +20,14 @@ class AutoGlmVisionClient:
         base_url: str | None = None,
         model: str | None = None,
     ) -> None:
-        self.api_key = api_key or get_env("AUTOGLM_API_KEY")
+        self.api_key = api_key or get_env("VLM_API_KEY")
         self.base_url = base_url or get_env(
-            "AUTOGLM_BASE_URL",
-            "https://open.bigmodel.cn/api/paas/v4",
+            "VLM_BASE_URL",
+            "https://api.openai.com/v1",
         )
-        self.model = model or get_env("AUTOGLM_MODEL", "autoglm-phone")
+        self.model = model or get_env("VLM_MODEL", "gpt-4.1-mini")
         if not self.api_key:
-            raise RuntimeError("缺少 AUTOGLM_API_KEY，请在 .env 中配置")
+            raise RuntimeError("缺少 VLM_API_KEY，请在 .env 中配置")
         self.client = OpenAI(api_key=self.api_key, base_url=self.base_url)
 
     def analyze_screenshot(self, screenshot: Path, task: str) -> str:
@@ -71,8 +71,9 @@ class AutoGlmVisionClient:
             'do(action="Tap", element=[x,y])、'
             'do(action="Type", text="xxx")、'
             'do(action="Swipe", start=[x1,y1], end=[x2,y2])、'
-            'do(action="Back")、do(action="Home")、'
+            'do(action="Back")、'
             'do(action="Wait", duration="x seconds")、'
+            'do(action="Take_over", message="xxx")、'
             'finish(message="xxx")。\n'
             "坐标系统从左上角 (0,0) 到右下角 (999,999)。\n"
             "规则：只输出下一步；先检查当前页面是否加载完成，"
