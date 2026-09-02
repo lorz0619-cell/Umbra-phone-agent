@@ -58,11 +58,18 @@ data class AgentGraphState(
     val consecutivePlanningFailures: Int = 0,
     val lastActionSignature: String? = null,
     val repeatedActionCount: Int = 0,
+    val repeatedWaitCount: Int = 0,
+    val repeatedTapCoordinateCount: Int = 0,
+    val repeatedTypeFailureCount: Int = 0,
+    val lastTapCoordinateKey: String? = null,
+    val candidateAttemptsInEpisode: Int = 0,
+    val lastCandidateFingerprint: String? = null,
     val tapTargetSignature: String? = null,
     val tapTargetAttempts: Int = 0,
     val lastFailedTapX: Int? = null,
     val lastFailedTapY: Int? = null,
     val nearbyTapAttempts: Int = 0,
+    val blockedTapCoordinates: Set<String> = emptySet(),
     val consecutiveNoProgressWaits: Int = 0,
     val consecutiveNoVisualProgress: Int = 0,
     val finalMessage: String? = null,
@@ -115,6 +122,7 @@ class AgentGraph(
 
     suspend fun run(): GraphRunResult {
         var state = AgentGraphState(task = task)
+        var terminalPhase = AgentPhase.FAILED
         try {
             trace(
                 kind = AgentTraceKind.TASK,
@@ -156,25 +164,46 @@ class AgentGraph(
                 state = command.state.copy(node = command.next)
             }
 
-            val phase = state.finalPhase ?: AgentPhase.FAILED
-            val message = state.finalMessage ?: "Agent 图在未给出结果时结束"
+            val rawPhase = state.finalPhase ?: AgentPhase.FAILED
+            val rawMessage = state.finalMessage ?: "Agent 图在未给出结果时结束"
+            val phase =
+                if (platform.mode == com.bluewhale.agent.model.TargetMode.VIRTUAL_DISPLAY && rawPhase == AgentPhase.COMPLETE) {
+                    AgentPhase.TAKEOVER
+                } else {
+                    rawPhase
+                }
+            terminalPhase = phase
+            val message =
+                if (phase == AgentPhase.TAKEOVER && rawPhase == AgentPhase.COMPLETE) {
+                    "$rawMessage。是否将虚拟屏当前页面接管到主屏？"
+                } else {
+                    rawMessage
+                }
+            val terminalKind =
+                when (phase) {
+                    AgentPhase.COMPLETE -> AgentTraceKind.COMPLETE
+                    AgentPhase.TAKEOVER -> AgentTraceKind.TAKEOVER
+                    else -> AgentTraceKind.ERROR
+                }
+            val terminalTitle =
+                when (phase) {
+                    AgentPhase.COMPLETE -> "任务完成"
+                    AgentPhase.TAKEOVER -> "任务等待人工接管"
+                    else -> "任务结束"
+                }
+            val terminalLevel =
+                when (phase) {
+                    AgentPhase.COMPLETE -> AgentTraceLevel.INFO
+                    AgentPhase.TAKEOVER -> AgentTraceLevel.WARNING
+                    else -> AgentTraceLevel.ERROR
+                }
             trace(
-                kind =
-                    if (phase == AgentPhase.COMPLETE) {
-                        AgentTraceKind.COMPLETE
-                    } else {
-                        AgentTraceKind.ERROR
-                    },
+                kind = terminalKind,
                 state = state,
                 phase = phase,
-                title = if (phase == AgentPhase.COMPLETE) "任务完成" else "任务结束",
+                title = terminalTitle,
                 message = message,
-                level =
-                    if (phase == AgentPhase.COMPLETE) {
-                        AgentTraceLevel.INFO
-                    } else {
-                        AgentTraceLevel.ERROR
-                    },
+                level = terminalLevel,
             )
             emit(
                 state,
@@ -193,7 +222,7 @@ class AgentGraph(
             state.observation?.recycle()
             // A virtual display must remain alive while the user decides whether to
             // move its current task to the physical display. AgentService owns cleanup.
-            if (state.finalPhase != AgentPhase.TAKEOVER) platform.stop()
+            if (terminalPhase != AgentPhase.TAKEOVER) platform.stop()
         }
     }
 
@@ -334,7 +363,7 @@ class AgentGraph(
                             state.activeSubtaskKey.isBlank() ||
                                 (
                                     state.consecutiveActionFailures == 0 &&
-                                        state.history.lastOrNull()?.verified != false
+                                        state.history.lastOrNull()?.subtaskProgressed == true
                                 )
                         val scope =
                             SubtaskScopePolicy.resolve(
@@ -353,8 +382,22 @@ class AgentGraph(
                                     if (scope.changed) 0 else state.subtaskReflectionCount,
                                 blockedActionKeys =
                                     if (scope.changed) emptySet() else state.blockedActionKeys,
+                                blockedTapCoordinates =
+                                    if (scope.changed) emptySet() else state.blockedTapCoordinates,
                                 consecutiveNoVisualProgress =
                                     if (scope.changed) 0 else state.consecutiveNoVisualProgress,
+                                repeatedWaitCount =
+                                    if (scope.changed) 0 else state.repeatedWaitCount,
+                                repeatedTapCoordinateCount =
+                                    if (scope.changed) 0 else state.repeatedTapCoordinateCount,
+                                repeatedTypeFailureCount =
+                                    if (scope.changed) 0 else state.repeatedTypeFailureCount,
+                                lastTapCoordinateKey =
+                                    if (scope.changed) null else state.lastTapCoordinateKey,
+                                candidateAttemptsInEpisode =
+                                    if (scope.changed) 0 else state.candidateAttemptsInEpisode,
+                                lastCandidateFingerprint =
+                                    if (scope.changed) null else state.lastCandidateFingerprint,
                             )
                         trace(
                             kind = AgentTraceKind.DECISION,
@@ -471,6 +514,25 @@ class AgentGraph(
                 )
         val pageActionKey =
             ReflectionPolicy.pageActionKey(state.actionPageSignature, action.reflectionKey())
+        val tapCoordinateKey = (action as? PhoneAction.Tap)?.coordinateKey()
+        if (tapCoordinateKey != null && tapCoordinateKey in state.blockedTapCoordinates) {
+            val blocked =
+                ReflectionAssessment(
+                    trigger = "blocked_tap_coordinate",
+                    evidence = "模型再次选择了反思层已禁止的 Tap 坐标：${action.describe()}",
+                    correction = "必须切换坐标、元素路径、动作类型或结束任务",
+                    blockedActionKeys = setOf(pageActionKey),
+                    blockedTapCoordinates = setOf(tapCoordinateKey),
+                )
+            return GraphCommand(
+                state.copy(
+                    executionResult = ActionResult.Failure(blocked.evidence),
+                    verification = VerificationResult(false, blocked.evidence),
+                    pendingReflection = blocked,
+                ),
+                AgentNode.REFLECT,
+            )
+        }
         val protectedActionReflection =
             when {
                 pageActionKey in state.blockedActionKeys ->
@@ -692,6 +754,7 @@ class AgentGraph(
                 )
         val reflections = state.subtaskReflectionCount + 1
         val blocked = state.blockedActionKeys + assessment.blockedActionKeys
+        val blockedTapCoordinates = state.blockedTapCoordinates + assessment.blockedTapCoordinates
         trace(
             kind = AgentTraceKind.REFLECTION,
             state = state,
@@ -723,7 +786,9 @@ class AgentGraph(
                 feedback = null,
                 pendingReflection = assessment,
                 subtaskReflectionCount = reflections,
+                candidateAttemptsInEpisode = 0,
                 blockedActionKeys = blocked,
+                blockedTapCoordinates = blockedTapCoordinates,
             ),
             AgentNode.PERCEIVE,
         )
@@ -757,6 +822,7 @@ class AgentGraph(
                     ),
                     AgentNode.END,
                 )
+        val blockedActions = state.blockedActionKeys + state.blockedTapCoordinates
 
         return try {
             val terminalAdjudication =
@@ -785,7 +851,7 @@ class AgentGraph(
                         history = state.history,
                         trigger = assessment.trigger,
                         evidence = assessment.evidence,
-                        blockedActions = state.blockedActionKeys,
+                        blockedActions = blockedActions,
                     )
                 } else {
                     model.reflectDecision(
@@ -795,7 +861,8 @@ class AgentGraph(
                         trigger = assessment.trigger,
                         evidence = assessment.evidence,
                         correction = assessment.correction,
-                        blockedActions = state.blockedActionKeys,
+                        blockedActions = blockedActions,
+                        candidateHints = assessment.candidateHints,
                     )
                 }
             when (decision) {
@@ -816,6 +883,9 @@ class AgentGraph(
                             observation.pageSignature(),
                             decision.action.reflectionKey(),
                         )
+                    val proposedTapCoordinateKey =
+                        (decision.action as? PhoneAction.Tap)?.coordinateKey()
+                    val proposedFingerprint = decision.action.proposalFingerprint()
                     trace(
                         kind = AgentTraceKind.REFLECTION,
                         state = proposedState,
@@ -837,7 +907,14 @@ class AgentGraph(
                                 putAll(decision.action.traceFields())
                             },
                     )
-                    if (proposedKey in state.blockedActionKeys) {
+                    if (
+                        proposedKey in state.blockedActionKeys ||
+                        (
+                            proposedTapCoordinateKey != null &&
+                                proposedTapCoordinateKey in state.blockedTapCoordinates
+                        ) ||
+                        proposedFingerprint == state.lastCandidateFingerprint
+                    ) {
                         val rejected =
                             ReflectionAssessment(
                                 trigger = "reflection_proposal_rejected",
@@ -847,6 +924,9 @@ class AgentGraph(
                                     "重新检查最新截图并选择不同动作类型、不同节点或明显不同的位置区域；" +
                                         "输入框可见时直接使用定向 Type",
                                 blockedActionKeys = setOf(proposedKey),
+                                blockedTapCoordinates =
+                                    proposedTapCoordinateKey?.let { setOf(it) }.orEmpty(),
+                                candidateHints = assessment.candidateHints,
                             )
                         GraphCommand(
                             proposedState.copy(
@@ -875,6 +955,8 @@ class AgentGraph(
                                 expectedOutcome = decision.expectedOutcome,
                                 actionPageSignature = observation.pageSignature(),
                                 pendingReflection = null,
+                                consecutiveActionFailures = 0,
+                                candidateAttemptsInEpisode = state.candidateAttemptsInEpisode + 1,
                             ),
                             AgentNode.VALIDATE,
                         )
@@ -917,7 +999,7 @@ class AgentGraph(
                     step = state.step,
                     action = action?.describe() ?: "planning",
                     result = verification.message,
-                    verified = verification.success,
+                    verified = verification.actionSucceeded,
                     packageName = state.observation?.accessibility?.packageName,
                     actionKey = action?.reflectionKey() ?: "planning",
                     beforeStateSignature = state.actionPageSignature,
@@ -925,6 +1007,8 @@ class AgentGraph(
                     rationale = state.decisionRationale,
                     expectedOutcome = state.expectedOutcome,
                     subtask = state.activeSubtask,
+                    actionSucceeded = verification.actionSucceeded,
+                    subtaskProgressed = verification.subtaskProgressed,
                 )
 
         if (action == null) {
@@ -972,19 +1056,14 @@ class AgentGraph(
 
         val isNoProgressWait =
             action is PhoneAction.Wait &&
-                !verification.treeChanged &&
-                !verification.packageChanged &&
-                verification.visualChangeScore <= STABILITY_VISUAL_THRESHOLD
+                verification.actionSucceeded &&
+                !verification.subtaskProgressed
         val noProgressWaits = if (isNoProgressWait) state.consecutiveNoProgressWaits + 1 else 0
-        val meaningfulVisualProgress =
-            verification.packageChanged ||
-                verification.treeChanged ||
-                verification.visualChangeScore > STABILITY_VISUAL_THRESHOLD
         val noVisualProgress =
             if (
                 action is PhoneAction.TakeOver ||
                 action is PhoneAction.SystemTool ||
-                meaningfulVisualProgress
+                verification.subtaskProgressed
             ) {
                 0
             } else {
@@ -997,6 +1076,58 @@ class AgentGraph(
             } else {
                 1
             }
+        val bigVisualChange =
+            verification.visualChangeScore >= BIG_VISUAL_CHANGE_THRESHOLD
+        val releasedActionKeys =
+            if (bigVisualChange) emptySet() else state.blockedActionKeys
+        val releasedTapCoordinates =
+            if (bigVisualChange) emptySet() else state.blockedTapCoordinates
+        val tapCoordinateKey = (action as? PhoneAction.Tap)?.coordinateKey()
+        val repeatedWaitCount =
+            if (bigVisualChange) {
+                0
+            } else if (action is PhoneAction.Wait) {
+                state.repeatedWaitCount + 1
+            } else {
+                0
+            }
+        val repeatedTypeFailureCount =
+            if (bigVisualChange) {
+                0
+            } else if (action is PhoneAction.Type && !verification.actionSucceeded) {
+                state.repeatedTypeFailureCount + 1
+            } else {
+                0
+            }
+        val repeatedTapCoordinateCount =
+            if (bigVisualChange) {
+                0
+            } else if (action is PhoneAction.Tap && tapCoordinateKey != null) {
+                if (tapCoordinateKey == state.lastTapCoordinateKey) {
+                    state.repeatedTapCoordinateCount + 1
+                } else {
+                    1
+                }
+            } else {
+                0
+            }
+        val loopState =
+            state.copy(
+                repeatedWaitCount = repeatedWaitCount,
+                repeatedTypeFailureCount = repeatedTypeFailureCount,
+                repeatedTapCoordinateCount = repeatedTapCoordinateCount,
+                lastTapCoordinateKey = if (action is PhoneAction.Tap) tapCoordinateKey else null,
+                candidateAttemptsInEpisode =
+                    if (bigVisualChange) 0 else state.candidateAttemptsInEpisode,
+                lastCandidateFingerprint =
+                    when {
+                        bigVisualChange -> null
+                        state.deviceAction != null -> action.proposalFingerprint()
+                        else -> state.lastCandidateFingerprint
+                    },
+                blockedActionKeys = releasedActionKeys,
+                blockedTapCoordinates = releasedTapCoordinates,
+            )
         val tapPoint = (action as? PhoneAction.Tap)?.normalizedCenter()
         val tapTargetSignature =
             (action as? PhoneAction.Tap)?.let { tap ->
@@ -1014,7 +1145,7 @@ class AgentGraph(
                 state.deviceAction is DeviceAction.Tap &&
                 state.executionResult is ActionResult.Success
         val tapTargetAttempts =
-            if (tapWasExecuted && !verification.success) {
+            if (tapWasExecuted && !verification.actionSucceeded) {
                 if (tapTargetSignature == state.tapTargetSignature) {
                     state.tapTargetAttempts + 1
                 } else {
@@ -1034,19 +1165,19 @@ class AgentGraph(
                     state.lastFailedTapY,
                 ) <= NEARBY_TAP_RADIUS * NEARBY_TAP_RADIUS
         val nearbyTapAttempts =
-            if (tapWasExecuted && !verification.success) {
+            if (tapWasExecuted && !verification.actionSucceeded) {
                 if (nearbyTap) state.nearbyTapAttempts + 1 else 1
             } else {
                 0
             }
         val typedTextHash =
-            if (verification.success && action is PhoneAction.Type) {
+            if (verification.actionSucceeded && action is PhoneAction.Type) {
                 action.text.hashCode()
             } else {
                 state.pendingTypedTextHash
             }
         val committedTextHash =
-            if (verification.success && action is PhoneAction.Tap && action.isSendAction()) {
+            if (verification.actionSucceeded && action is PhoneAction.Tap && action.isSendAction()) {
                 typedTextHash
             } else {
                 null
@@ -1063,15 +1194,18 @@ class AgentGraph(
             kind = AgentTraceKind.ROUTING,
             state = state,
             phase = AgentPhase.ROUTE,
-            title = if (verification.success) "继续下一步" else "失败后重新规划",
+            title = if (verification.actionSucceeded) "继续下一步" else "失败后重新规划",
             message = verification.message,
             fields =
                 linkedMapOf(
-                    "verified" to verification.success.toString(),
+                    "verified" to verification.actionSucceeded.toString(),
                     "action_failures" to
-                        (if (verification.success) 0 else state.consecutiveActionFailures + 1).toString(),
+                        (if (verification.actionSucceeded) 0 else state.consecutiveActionFailures + 1).toString(),
                     "planning_failures" to "0",
                     "repeated_action" to repeated.toString(),
+                    "repeated_wait" to repeatedWaitCount.toString(),
+                    "repeated_tap_coordinate" to repeatedTapCoordinateCount.toString(),
+                    "repeated_type_failure" to repeatedTypeFailureCount.toString(),
                     "no_visual_progress" to noVisualProgress.toString(),
                 ).apply {
                     if (action is PhoneAction.Tap) {
@@ -1080,18 +1214,48 @@ class AgentGraph(
                     }
                 },
             level =
-                if (verification.success) {
+                if (verification.actionSucceeded) {
                     AgentTraceLevel.INFO
                 } else {
                     AgentTraceLevel.WARNING
                 },
         )
         if (
-            verification.success &&
+            action is PhoneAction.Tap &&
+            state.candidateAttemptsInEpisode >= MAX_CANDIDATE_ATTEMPTS_PER_REFLECTION &&
+            !bigVisualChange &&
+            !verification.subtaskProgressed
+        ) {
+            return GraphCommand(
+                loopState.copy(
+                    history = history,
+                    pendingReflection =
+                        ReflectionAssessment(
+                            trigger = "candidate_paths_exhausted",
+                            evidence =
+                                "当前反思 episode 已尝试 ${state.candidateAttemptsInEpisode} 个不同候选路径，" +
+                                    "仍未产生大变化或子任务进展",
+                            correction =
+                                "重新感知并生成下一组路径候选；若仍没有明显差异，则请求人工接管",
+                            blockedActionKeys = emptySet(),
+                            candidateHints =
+                                tapCandidateHints(
+                                    observation = state.observation,
+                                    failedPoint = tapPoint,
+                                    targetDescription =
+                                        (action as? PhoneAction.Tap)?.targetDescription.orEmpty(),
+                                ),
+                        ),
+                ),
+                AgentNode.REFLECT,
+            )
+        }
+        if (
+            verification.actionSucceeded &&
             noVisualProgress >= NO_PROGRESS_REFLECTION_SIGNAL_ACTIONS
         ) {
             return GraphCommand(
-                state.copy(
+                loopState.copy(
                     history = history,
                     consecutiveNoVisualProgress = noVisualProgress,
                     pendingReflection =
@@ -1109,10 +1273,10 @@ class AgentGraph(
                 AgentNode.REFLECT,
             )
         }
-        if (verification.success && noProgressWaits > 0) {
+        if (verification.actionSucceeded && noProgressWaits > 0) {
             if (noProgressWaits >= MAX_NO_PROGRESS_WAITS) {
                 return GraphCommand(
-                    state.copy(
+                    loopState.copy(
                         history = history,
                         consecutiveNoProgressWaits = noProgressWaits,
                         consecutiveNoVisualProgress = noVisualProgress,
@@ -1128,7 +1292,7 @@ class AgentGraph(
                 )
             }
             return GraphCommand(
-                state.copy(
+                loopState.copy(
                     history = history,
                     feedback =
                         "等待没有带来页面、语义树或包名变化；请改为 tap、swipe、back 或 complete_task。",
@@ -1143,7 +1307,7 @@ class AgentGraph(
             )
         }
 
-        if (action is PhoneAction.TakeOver && verification.success) {
+        if (action is PhoneAction.TakeOver && verification.actionSucceeded) {
             return GraphCommand(
                 state.copy(
                     history = history,
@@ -1154,7 +1318,7 @@ class AgentGraph(
             )
         }
 
-        if (action is PhoneAction.SystemTool && verification.success) {
+        if (action is PhoneAction.SystemTool && verification.actionSucceeded) {
             val requiresTakeOver =
                 platform.mode == com.bluewhale.agent.model.TargetMode.VIRTUAL_DISPLAY &&
                     action.capability.requiresUserInteraction
@@ -1177,7 +1341,7 @@ class AgentGraph(
         }
 
         if (
-            verification.success &&
+            verification.actionSucceeded &&
             action is PhoneAction.Launch &&
             platform.mode == com.bluewhale.agent.model.TargetMode.VIRTUAL_DISPLAY &&
             isLaunchOnlyTask(state.task)
@@ -1197,12 +1361,32 @@ class AgentGraph(
                 history = history,
                 tapTargetAttempts = tapTargetAttempts,
                 nearbyTapAttempts = nearbyTapAttempts,
+                repeatedWaitCount = repeatedWaitCount,
+                repeatedTapCoordinateCount = repeatedTapCoordinateCount,
+                repeatedTypeFailureCount = repeatedTypeFailureCount,
+                currentTapCoordinateKey = tapCoordinateKey,
             )
-        if (reflection != null) {
+        val reflectionWithCandidates =
+            if (reflection?.trigger == "repeated_tap_coordinate") {
+                reflection.copy(
+                    candidateHints =
+                        tapCandidateHints(
+                            observation = state.observation,
+                            failedPoint = tapPoint,
+                            targetDescription =
+                                (action as? PhoneAction.Tap)?.targetDescription.orEmpty(),
+                        ),
+                )
+            } else {
+                reflection
+            }
+        if (reflectionWithCandidates != null) {
             return GraphCommand(
-                state.copy(
+                loopState.copy(
                     history = history,
-                    pendingReflection = reflection,
+                    pendingReflection = reflectionWithCandidates,
+                    blockedTapCoordinates =
+                        releasedTapCoordinates + reflectionWithCandidates.blockedTapCoordinates,
                     pendingTypedTextHash = pendingTypedTextHash,
                     committedTextHashes = committedTextHashes,
                     consecutiveNoVisualProgress = noVisualProgress,
@@ -1221,10 +1405,10 @@ class AgentGraph(
             )
         }
 
-        if (!verification.success) {
+        if (!verification.actionSucceeded) {
             if (action is PhoneAction.Tap && tapTargetAttempts >= MAX_TAP_TARGET_ATTEMPTS) {
                 return GraphCommand(
-                    state.copy(
+                    loopState.copy(
                         history = history,
                     pendingReflection =
                         ReflectionAssessment(
@@ -1240,7 +1424,7 @@ class AgentGraph(
             val failures = state.consecutiveActionFailures + 1
             if (failures >= maxConsecutiveFailures) {
                 return GraphCommand(
-                    state.copy(
+                    loopState.copy(
                         history = history,
                         consecutiveActionFailures = failures,
                         pendingReflection =
@@ -1255,7 +1439,7 @@ class AgentGraph(
                 )
             }
             return GraphCommand(
-                state.copy(
+                loopState.copy(
                     history = history,
                     feedback =
                         if (action is PhoneAction.Tap) {
@@ -1296,7 +1480,7 @@ class AgentGraph(
         }
 
         return GraphCommand(
-            state.copy(
+            loopState.copy(
                 history = history,
                 feedback =
                     if (committedTextHash != null) {
@@ -1676,6 +1860,98 @@ class AgentGraph(
             ((it.left + it.right) / 2) to ((it.top + it.bottom) / 2)
         } ?: (x to y)
 
+    private fun PhoneAction.Tap.coordinateKey(): String {
+        val center = normalizedCenter()
+        return "tap:coord:${center.first}:${center.second}"
+    }
+
+    private fun PhoneAction.proposalFingerprint(): String =
+        when (this) {
+            is PhoneAction.Tap -> "tap:${coordinateKey()}"
+            is PhoneAction.Wait -> "wait"
+            is PhoneAction.Type -> "type"
+            else -> reflectionKey()
+        }
+
+    private fun tapCandidateHints(
+        observation: PerceptionSnapshot?,
+        failedPoint: Pair<Int, Int>?,
+        targetDescription: String,
+    ): List<String> {
+        if (observation == null) return emptyList()
+
+        val hints = linkedSetOf<String>()
+        val packageName = observation.accessibility.packageName.orEmpty()
+        if (packageName == "com.netease.cloudmusic") {
+            hints += "网易云路径偏好：先 Back 返回首页，再点击首页顶部放大镜/顶部搜索栏；忽略底部“搜索”导航按钮"
+        }
+        if (failedPoint != null) {
+            val (x, y) = failedPoint
+            listOf(
+                0 to -12,
+                0 to 12,
+                -12 to 0,
+                12 to 0,
+                0 to -24,
+                0 to 24,
+            ).forEach { (dx, dy) ->
+                val nextX = (x + dx).coerceIn(0, 999)
+                val nextY = (y + dy).coerceIn(0, 999)
+                hints += "tap:($nextX,$nextY)"
+            }
+        }
+
+        val preferTopSearch =
+            packageName == "com.netease.cloudmusic" &&
+                (
+                    targetDescription.contains("搜索", ignoreCase = true) ||
+                        targetDescription.contains("底部", ignoreCase = true)
+                )
+        observation.accessibility.elements
+            .asSequence()
+            .filter { it.clickable || it.contentDescription.isNotBlank() || it.text.isNotBlank() }
+            .filter { element ->
+                if (!preferTopSearch) {
+                    true
+                } else {
+                    val centerY = (element.bounds.top + element.bounds.bottom) / 2
+                    (centerY.toDouble() / observation.screen.height * 999).toInt() < 700
+                }
+            }
+            .toList()
+            .sortedBy { element ->
+                if (failedPoint == null) {
+                    0
+                } else {
+                    val centerX = (element.bounds.left + element.bounds.right) / 2
+                    val centerY = (element.bounds.top + element.bounds.bottom) / 2
+                    squaredDistance(
+                        (centerX.toDouble() / observation.screen.width * 999).toInt(),
+                        (centerY.toDouble() / observation.screen.height * 999).toInt(),
+                        failedPoint.first,
+                        failedPoint.second,
+                    )
+                }
+            }
+            .take(5)
+            .forEach { element ->
+                val label =
+                    listOf(
+                            element.contentDescription.takeIf { it.isNotBlank() },
+                            element.text.takeIf { it.isNotBlank() },
+                        )
+                        .firstOrNull()
+                        .orEmpty()
+                hints += "tap element_index=${element.index} label=${label.ifBlank { element.className.substringAfterLast('.') }}"
+            }
+
+        hints += "back"
+        hints += "swipe_up"
+        hints += "wait_1000ms"
+        hints += "type_focused"
+        return hints.take(8).toList()
+    }
+
     private fun PhoneAction.NormalizedBounds.locationBucket(): String {
         val centerX = (left + right) / 2
         val centerY = (top + bottom) / 2
@@ -1703,6 +1979,8 @@ class AgentGraph(
         const val NEARBY_TAP_RADIUS = 50
         const val STABILITY_POLL_MS = 300L
         const val STABILITY_VISUAL_THRESHOLD = 0.004
+        const val BIG_VISUAL_CHANGE_THRESHOLD = 0.25
+        const val MAX_CANDIDATE_ATTEMPTS_PER_REFLECTION = 3
         const val REQUIRED_STABLE_SAMPLES = 2
         const val MAX_NO_PROGRESS_WAITS = 3
         const val NO_VISUAL_PROGRESS_WARNING_ACTIONS = 4

@@ -8,12 +8,15 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.PixelFormat
 import android.graphics.Rect
+import android.hardware.display.DisplayManager
 import android.media.ImageReader
 import android.os.Build
 import android.util.Log
 import android.os.Bundle
 import android.os.SystemClock
+import android.util.DisplayMetrics
 import android.view.Display
+import android.view.Surface
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
 import com.bluewhale.agent.BuildConfig
@@ -52,7 +55,7 @@ class VirtualDisplayAgentPlatform(
     }
 
     private val client = ShizukuVirtualDisplayClient()
-    private val config = VirtualDisplayConfig.fromPhysicalDisplay(service)
+    private var config = VirtualDisplayConfig.fromPhysicalDisplay(service)
     private val lifecycleMutex = Mutex()
     private val captureMutex = Mutex()
 
@@ -61,6 +64,12 @@ class VirtualDisplayAgentPlatform(
 
     @Volatile
     private var displayId: Int = Display.INVALID_DISPLAY
+
+    @Volatile
+    private var displayRotation: Int = Surface.ROTATION_0
+
+    @Volatile
+    private var capturePaused: Boolean = false
 
     @Volatile
     private var imageReader: ImageReader? = null
@@ -119,6 +128,8 @@ class VirtualDisplayAgentPlatform(
 
             displayId = createdId
             imageReader = reader
+            capturePaused = false
+            displayRotation = currentDisplay()?.rotation ?: Surface.ROTATION_0
         }
         delay(SURFACE_READY_DELAY_MS)
     }
@@ -147,12 +158,74 @@ class VirtualDisplayAgentPlatform(
                 lastSuccessfulFrame = null
                 lastSuccessfulFrameId = 0L
                 lastSuccessfulFrameAtMs = 0L
+                capturePaused = false
+                displayRotation = Surface.ROTATION_0
                 client.clear()
             }
         }
     }
 
+    private fun currentDisplay(): Display? {
+        val currentDisplay = displayId
+        if (currentDisplay == Display.INVALID_DISPLAY) return null
+        return runCatching {
+            service.getSystemService(DisplayManager::class.java).getDisplay(currentDisplay)
+        }.getOrNull()
+    }
+
+    private fun displayMetrics(display: Display): DisplayMetrics =
+        DisplayMetrics().also { display.getRealMetrics(it) }
+
+    private suspend fun syncDisplayRotation() =
+        lifecycleMutex.withLock {
+            val currentDisplay = displayId
+            if (currentDisplay == Display.INVALID_DISPLAY) return@withLock
+            val display = currentDisplay() ?: return@withLock
+            val rotation = display.rotation
+            val metrics = displayMetrics(display)
+            if (
+                rotation == displayRotation &&
+                metrics.widthPixels == config.width &&
+                metrics.heightPixels == config.height
+            ) {
+                return@withLock
+            }
+
+            val replacement =
+                ImageReader.newInstance(
+                    metrics.widthPixels,
+                    metrics.heightPixels,
+                    PixelFormat.RGBA_8888,
+                    IMAGE_READER_MAX_IMAGES,
+                )
+            if (!client.setVirtualDisplaySurface(currentDisplay, replacement.surface)) {
+                replacement.close()
+                return@withLock
+            }
+
+            val previous = imageReader
+            imageReader = replacement
+            previous?.close()
+            config =
+                VirtualDisplayConfig(
+                    width = metrics.widthPixels,
+                    height = metrics.heightPixels,
+                    densityDpi = metrics.densityDpi,
+                    density = metrics.density,
+                )
+            displayRotation = rotation
+            Log.i(
+                TAG,
+                "Virtual display rotation synced rotation=$rotation size=${metrics.widthPixels}x${metrics.heightPixels}",
+            )
+            delay(SURFACE_READY_DELAY_MS)
+        }
+
     override suspend fun captureScreen(): ScreenCapture = captureMutex.withLock {
+        if (capturePaused) {
+            error("已请求人工接管，停止虚拟屏感知")
+        }
+        syncDisplayRotation()
         var reader = imageReader ?: error("虚拟屏未启动")
         var image = awaitImage(reader, FIRST_FRAME_TIMEOUT_MS)
         if (image == null) {
@@ -169,8 +242,8 @@ class VirtualDisplayAgentPlatform(
             Log.w(TAG, "No fresh virtual-display frame; using last successful frame")
             val bitmap = cached.copy(cached.config ?: Bitmap.Config.ARGB_8888, false)
             return@withLock ScreenCapture(
-                width = config.width,
-                height = config.height,
+                width = bitmap.width,
+                height = bitmap.height,
                 bitmap = bitmap,
                 frameId = lastSuccessfulFrameId,
                 capturedAtElapsedRealtimeMs = lastSuccessfulFrameAtMs,
@@ -213,8 +286,8 @@ class VirtualDisplayAgentPlatform(
                 _preview.value = bitmap.copy(bitmap.config ?: Bitmap.Config.ARGB_8888, true)
 
                 ScreenCapture(
-                    width = config.width,
-                    height = config.height,
+                    width = bitmap.width,
+                    height = bitmap.height,
                     bitmap = bitmap,
                     frameId = lastSuccessfulFrameId,
                     capturedAtElapsedRealtimeMs = lastSuccessfulFrameAtMs,
@@ -262,6 +335,8 @@ class VirtualDisplayAgentPlatform(
             replacement
         }
     override suspend fun captureAccessibility(): AccessibilitySnapshot {
+        if (capturePaused) return AccessibilitySnapshot()
+        syncDisplayRotation()
         val root = rootOnDisplay()
         return try {
             AccessibilityTreeExtractor.extract(root)
@@ -271,6 +346,10 @@ class VirtualDisplayAgentPlatform(
     }
 
     override suspend fun performAction(action: DeviceAction): ActionResult {
+        if (capturePaused && action !is DeviceAction.TakeOver) {
+            return ActionResult.Failure("已请求人工接管，虚拟屏不再执行自动动作")
+        }
+        syncDisplayRotation()
         val currentDisplay = displayId
         if (currentDisplay == Display.INVALID_DISPLAY) {
             return ActionResult.Failure("虚拟屏未启动")
@@ -469,6 +548,10 @@ class VirtualDisplayAgentPlatform(
         } else {
             ActionResult.Failure("虚拟屏未找到可输入控件，且非 IME 输入失败")
         }
+    }
+
+    override suspend fun pauseForTakeover() {
+        capturePaused = true
     }
 
     override suspend fun handoffToMainScreen(): ActionResult =

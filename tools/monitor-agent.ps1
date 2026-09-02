@@ -227,6 +227,10 @@ function Show-CompactUmbraEvent {
             Write-Host ("| [{0}] [DONE] {1}" -f $EventTime, (Get-ShortText ([string]$Event.message) 260)) -ForegroundColor Green
             Write-Host "+----------------------------------------------------+" -ForegroundColor Green
         }
+        "TAKEOVER" {
+            Write-Host ("| [{0}] [HANDOFF] {1}" -f $EventTime, (Get-ShortText ([string]$Event.message) 260)) -ForegroundColor Magenta
+            Write-Host "+----------------------------------------------------+" -ForegroundColor Magenta
+        }
         "ERROR" {
             $diagnosis = Get-EventField $Event "diagnosis"
             Write-Host ("| [{0}] [ERROR] {1}: {2}" -f $EventTime, $Event.title, (Get-ShortText ([string]$Event.message) 260)) -ForegroundColor Red
@@ -293,6 +297,7 @@ function Show-UmbraEvent {
                     "EXECUTION" { "Blue" }
                     "VERIFICATION" { "Green" }
                     "COMPLETE" { "Green" }
+                    "TAKEOVER" { "Magenta" }
                     default { "DarkGray" }
                 }
             }
@@ -309,6 +314,7 @@ function Show-UmbraEvent {
             "ROUTING" { "[NEXT]" }
             "REFLECTION" { "[REFLECT]" }
             "COMPLETE" { "[DONE]" }
+            "TAKEOVER" { "[HANDOFF]" }
             "ERROR" { "[ERR]" }
             default { "[LOG]" }
         }
@@ -327,7 +333,7 @@ function Show-UmbraEvent {
             Write-EventField -Name $property.Name -Value ([string]$property.Value)
         }
     }
-    if ($kind -eq "COMPLETE" -or $kind -eq "ERROR") {
+    if ($kind -eq "COMPLETE" -or $kind -eq "TAKEOVER" -or $kind -eq "ERROR") {
         Write-Host "+------------------------------------------------------+" -ForegroundColor $color
     }
 }

@@ -1,0 +1,204 @@
+{
+  "schema_version": 1,
+  "name": "benchtask-smoke-v1",
+  "description": "Benchtask smoke suite: fast, low-risk coverage across launch, system tools, search, input, and virtual display.",
+  "defaults": {
+    "mode": "MAIN_SCREEN",
+    "max_steps": 8,
+    "timeout_seconds": 240,
+    "repetitions": 1
+  },
+  "tasks": [
+    {
+      "id": "smoke-01-launch",
+      "enabled": true,
+      "category": "launch",
+      "description": "打开QQ · 主屏",
+      "instruction": "打开QQ",
+      "mode": "MAIN_SCREEN",
+      "max_steps": 5,
+      "timeout_seconds": 240,
+      "repetitions": 1,
+      "required_packages": [
+        "com.tencent.mobileqq"
+      ],
+      "notes": "无需人工；保留为最稳定的 L0 启动项。",
+      "oracle": {
+        "terminal_phases": [
+          "COMPLETE"
+        ],
+        "required_actions": [
+          "Launch"
+        ],
+        "package_regex": "^com\\.tencent\\.mobileqq$",
+        "max_steps": 5,
+        "max_reflections": 1,
+        "max_failed_verifications": 1,
+        "manual": false
+      }
+    },
+    {
+      "id": "smoke-02-launch",
+      "enabled": true,
+      "category": "launch",
+      "description": "打开QQ · 虚拟屏",
+      "instruction": "打开QQ",
+      "mode": "VIRTUAL_DISPLAY",
+      "max_steps": 5,
+      "timeout_seconds": 240,
+      "repetitions": 1,
+      "required_packages": [
+        "com.tencent.mobileqq"
+      ],
+      "notes": "无需人工；覆盖虚拟屏 Launch。",
+      "oracle": {
+        "terminal_phases": [
+          "TAKEOVER",
+          "COMPLETE"
+        ],
+        "required_actions": [
+          "Launch"
+        ],
+        "max_steps": 5,
+        "max_reflections": 1,
+        "max_failed_verifications": 1,
+        "manual": false
+      }
+    },
+    {
+      "id": "smoke-03-camera",
+      "enabled": true,
+      "category": "camera",
+      "description": "打开相机准备拍照 · 主屏",
+      "instruction": "打开相机准备拍照",
+      "mode": "MAIN_SCREEN",
+      "max_steps": 6,
+      "timeout_seconds": 240,
+      "repetitions": 1,
+      "notes": "需要人工确认相机界面且无快门副作用。",
+      "oracle": {
+        "terminal_phases": [
+          "COMPLETE"
+        ],
+        "max_steps": 6,
+        "max_reflections": 1,
+        "max_failed_verifications": 1,
+        "manual": true,
+        "manual_prompt": "相机是否已打开拍照界面，并且没有实际拍照？"
+      }
+    },
+    {
+      "id": "smoke-04-system-tool",
+      "enabled": true,
+      "category": "system-tool",
+      "description": "设置每天早上7点15分的闹钟，标签为 UmbraBench · 主屏",
+      "instruction": "设置每天早上7点15分的闹钟，标签为 UmbraBench",
+      "mode": "MAIN_SCREEN",
+      "max_steps": 6,
+      "timeout_seconds": 240,
+      "repetitions": 1,
+      "notes": "需要人工确认标签、时间且未保存。",
+      "oracle": {
+        "terminal_phases": [
+          "COMPLETE"
+        ],
+        "max_steps": 6,
+        "max_reflections": 1,
+        "max_failed_verifications": 1,
+        "manual": true,
+        "manual_prompt": "闹钟界面是否显示了每天 07:15、标签 UmbraBench，并且没有保存？"
+      }
+    },
+    {
+      "id": "smoke-05-system-tool",
+      "enabled": true,
+      "category": "system-tool",
+      "description": "导航到上海站一号线一号口 · 主屏",
+      "instruction": "导航到上海站一号线一号口",
+      "mode": "MAIN_SCREEN",
+      "max_steps": 6,
+      "timeout_seconds": 240,
+      "repetitions": 1,
+      "notes": "需要人工核对地图上的地址。",
+      "oracle": {
+        "terminal_phases": [
+          "COMPLETE"
+        ],
+        "max_steps": 6,
+        "max_reflections": 1,
+        "max_failed_verifications": 1,
+        "manual": true,
+        "manual_prompt": "导航是否打开并显示“上海站一号线一号口”？"
+      }
+    },
+    {
+      "id": "smoke-06-social-navigation",
+      "enabled": true,
+      "category": "social-navigation",
+      "description": "打开QQ，进入联系人“我的电脑”的聊天页面 · 主屏",
+      "instruction": "打开QQ，进入联系人“我的电脑”的聊天页面",
+      "mode": "MAIN_SCREEN",
+      "max_steps": 12,
+      "timeout_seconds": 240,
+      "repetitions": 1,
+      "required_packages": [
+        "com.tencent.mobileqq"
+      ],
+      "notes": "需要人工确认页面正确。",
+      "oracle": {
+        "terminal_phases": [
+          "COMPLETE"
+        ],
+        "max_steps": 12,
+        "max_reflections": 2,
+        "max_failed_verifications": 2,
+        "manual": true,
+        "manual_prompt": "QQ 是否进入“我的电脑”聊天页面？"
+      }
+    },
+    {
+      "id": "smoke-07-browser",
+      "enabled": true,
+      "category": "browser",
+      "description": "打开浏览器，并搜索”umbra“ · 主屏",
+      "instruction": "打开浏览器，并搜索”umbra“",
+      "mode": "MAIN_SCREEN",
+      "max_steps": 10,
+      "timeout_seconds": 240,
+      "repetitions": 1,
+      "notes": "需要人工确认搜索词和结果页。",
+      "oracle": {
+        "terminal_phases": [
+          "COMPLETE"
+        ],
+        "max_steps": 10,
+        "max_reflections": 2,
+        "max_failed_verifications": 2,
+        "manual": true,
+        "manual_prompt": "浏览器是否显示“umbra”搜索结果页？"
+      }
+    },
+    {
+      "id": "smoke-08-notes",
+      "enabled": true,
+      "category": "notes",
+      "description": "打开便签，创建新便签，并输入”[UmbraBench] 固定文字测试“ · 主屏",
+      "instruction": "打开便签，创建新便签，并输入”[UmbraBench] 固定文字测试“",
+      "mode": "MAIN_SCREEN",
+      "max_steps": 12,
+      "timeout_seconds": 240,
+      "repetitions": 1,
+      "notes": "需要人工确认便签存在且内容正确。",
+      "oracle": {
+        "terminal_phases": [
+          "COMPLETE"
+        ],
+        "max_steps": 12,
+        "max_reflections": 3,
+        "max_failed_verifications": 3,
+        "manual": true,
+        "manual_prompt": "便签是否创建成功且内容为“[UmbraBench] 固定文字测试”？"
+      }
+    }
+  ]
+}

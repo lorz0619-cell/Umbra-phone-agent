@@ -308,6 +308,8 @@ data class VerificationResult(
     val visualChangeScore: Double = 0.0,
     val packageChanged: Boolean = false,
     val treeChanged: Boolean = false,
+    val actionSucceeded: Boolean = success,
+    val subtaskProgressed: Boolean = false,
 )
 
 enum class AgentTraceKind {
@@ -321,6 +323,7 @@ enum class AgentTraceKind {
     ROUTING,
     REFLECTION,
     COMPLETE,
+    TAKEOVER,
     ERROR,
 }
 
@@ -353,6 +356,8 @@ data class ActionHistoryEntry(
     val rationale: String = "",
     val expectedOutcome: String = "",
     val subtask: String = "",
+    val actionSucceeded: Boolean = verified,
+    val subtaskProgressed: Boolean = false,
 )
 
 enum class AgentPhase(val label: String) {

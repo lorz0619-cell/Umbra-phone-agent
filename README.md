@@ -84,6 +84,22 @@ APK 输出：
 android\app\build\outputs\apk\debug\app-debug.apk
 ```
 
+## Benchmark
+
+项目内置真机 Benchmark runner，可通过 ADB 顺序运行参数化任务，采集结构化 Agent
+事件，并输出任务终态、动作、步数、反思次数、失败验证次数、耗时及人工判定结果：
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File `
+  .\tools\benchmark\run-benchmark.ps1 -ValidateOnly
+
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File `
+  .\tools\benchmark\run-benchmark.ps1 -BuildAndInstallBenchmark
+```
+
+结果默认写入被 Git 忽略的 `benchmark-results\`。任务清单、评分口径、正式版恢复方式和
+自定义案例模板见 [Benchmark 使用说明](benchmarks/README.md)。
+
 ## 电脑端实时调试
 
 Agent 内部过程不在手机 UI 中展示。连接手机后，在 PowerShell 运行：

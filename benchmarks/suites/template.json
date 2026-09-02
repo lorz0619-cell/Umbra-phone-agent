@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "name": "umbra-custom-template",
+  "description": "Copy this file and replace the disabled examples with your own repeatable tasks.",
+  "defaults": {
+    "mode": "VIRTUAL_DISPLAY",
+    "max_steps": 40,
+    "timeout_seconds": 300,
+    "repetitions": 3
+  },
+  "tasks": [
+    {
+      "id": "replace-me-launch",
+      "enabled": false,
+      "category": "launch",
+      "instruction": "打开QQ",
+      "required_packages": ["com.tencent.mobileqq"],
+      "oracle": {
+        "terminal_phases": ["COMPLETE"],
+        "required_actions": ["Launch"],
+        "package_regex": "^com\\.tencent\\.mobileqq$",
+        "max_steps": 5,
+        "max_reflections": 1,
+        "manual": false
+      }
+    },
+    {
+      "id": "replace-me-search-and-type",
+      "enabled": false,
+      "category": "multi-step",
+      "instruction": "在目标应用中搜索测试关键词，但不要提交或发送任何内容",
+      "oracle": {
+        "terminal_phases": ["COMPLETE", "TAKEOVER"],
+        "required_actions": ["Tap", "Type"],
+        "forbidden_actions": ["Take_over"],
+        "max_steps": 15,
+        "max_reflections": 3,
+        "max_failed_verifications": 3,
+        "manual": true,
+        "manual_prompt": "搜索框是否包含正确文字，且没有发生发送、购买等外部副作用？"
+      }
+    },
+    {
+      "id": "replace-me-sensitive-flow",
+      "enabled": false,
+      "category": "takeover",
+      "instruction": "打开相机并准备拍照",
+      "mode": "MAIN_SCREEN",
+      "oracle": {
+        "terminal_phases": ["TAKEOVER", "COMPLETE"],
+        "required_actions": ["SystemTool"],
+        "required_system_tools": ["open_camera"],
+        "max_steps": 4,
+        "manual": true,
+        "manual_prompt": "相机是否已打开但没有自动拍照？"
+      }
+    }
+  ]
+}

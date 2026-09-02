@@ -19,6 +19,8 @@ class ActionVerifier {
             return VerificationResult(
                 success = false,
                 message = "动作执行失败：${executionResult.message}",
+                actionSucceeded = false,
+                subtaskProgressed = false,
             )
         }
         executionResult as ActionResult.Success
@@ -30,15 +32,39 @@ class ActionVerifier {
         val treeChanged =
             before.accessibility.treeHash != after.accessibility.treeHash &&
                 after.accessibility.treeHash != 0L
+        val focusChanged =
+            before.accessibility.focusedText != after.accessibility.focusedText
+        val visualProgress =
+            treeChanged ||
+                packageChanged ||
+                visualScore >= PROGRESS_VISUAL_THRESHOLD
 
         return when (requested) {
             is PhoneAction.Wait ->
-                success("等待完成并重新感知页面", visualScore, packageChanged, treeChanged)
+                success(
+                    "等待完成并重新感知页面",
+                    visualScore,
+                    packageChanged,
+                    treeChanged,
+                    visualProgress,
+                )
             is PhoneAction.TakeOver ->
-                success("已暂停自动执行，等待人工接管", visualScore, packageChanged, treeChanged)
+                success(
+                    "已暂停自动执行，等待人工接管",
+                    visualScore,
+                    packageChanged,
+                    treeChanged,
+                    false,
+                )
             is PhoneAction.SystemTool -> {
                 if (executionResult.metadata["system_verified"] == "true") {
-                    success("系统工具已由 Android 执行器确认分发", visualScore, packageChanged, treeChanged)
+                    success(
+                        "系统工具已由 Android 执行器确认分发",
+                        visualScore,
+                        packageChanged,
+                        treeChanged,
+                        false,
+                    )
                 } else {
                     failure("系统工具没有返回可验证的分发结果", visualScore, packageChanged, treeChanged)
                 }
@@ -62,7 +88,13 @@ class ActionVerifier {
                     executorVerified ||
                     targetedDispatchWithVisualEvidence
                 ) {
-                    success("输入内容已通过无障碍树/执行器校验", visualScore, packageChanged, treeChanged)
+                    success(
+                        "输入内容已通过无障碍树/执行器校验",
+                        visualScore,
+                        packageChanged,
+                        treeChanged,
+                        visualProgress,
+                    )
                 } else {
                     failure(
                         "未在输入焦点或页面语义树中确认目标文本，禁止假定 Type 成功",
@@ -91,30 +123,56 @@ class ActionVerifier {
                         treeChanged,
                     )
                 } else if (packageMatches || packageChanged || visualScore >= LAUNCH_VISUAL_THRESHOLD) {
-                    success("前台应用或屏幕已确认发生变化", visualScore, packageChanged, treeChanged)
+                    success(
+                        "前台应用或屏幕已确认发生变化",
+                        visualScore,
+                        packageChanged,
+                        treeChanged,
+                        packageChanged ||
+                            treeChanged ||
+                            visualScore >= LAUNCH_VISUAL_THRESHOLD,
+                    )
                 } else {
                     failure("Launch 后前台应用和屏幕均未确认变化", visualScore, packageChanged, treeChanged)
                 }
             }
             is PhoneAction.Tap -> {
-                val focusChanged =
-                    before.accessibility.focusedText != after.accessibility.focusedText
                 if (visualScore >= TAP_VISUAL_THRESHOLD || treeChanged || packageChanged || focusChanged) {
-                    success("点击后页面/焦点变化已确认", visualScore, packageChanged, treeChanged)
+                    success(
+                        "点击后页面/焦点变化已确认",
+                        visualScore,
+                        packageChanged,
+                        treeChanged,
+                        treeChanged ||
+                            packageChanged ||
+                            visualScore >= TAP_VISUAL_THRESHOLD,
+                    )
                 } else {
                     failure("Tap 后未检测到页面、语义树或焦点变化", visualScore, packageChanged, treeChanged)
                 }
             }
             is PhoneAction.Swipe -> {
                 if (visualScore >= SWIPE_VISUAL_THRESHOLD || treeChanged || packageChanged) {
-                    success("滑动后的页面变化已确认", visualScore, packageChanged, treeChanged)
+                    success(
+                        "滑动后的页面变化已确认",
+                        visualScore,
+                        packageChanged,
+                        treeChanged,
+                        true,
+                    )
                 } else {
                     failure("Swipe 后页面没有可确认变化", visualScore, packageChanged, treeChanged)
                 }
             }
             PhoneAction.Back -> {
                 if (visualScore >= BACK_VISUAL_THRESHOLD || treeChanged || packageChanged) {
-                    success("返回后的页面变化已确认", visualScore, packageChanged, treeChanged)
+                    success(
+                        "返回后的页面变化已确认",
+                        visualScore,
+                        packageChanged,
+                        treeChanged,
+                        true,
+                    )
                 } else {
                     failure("Back 后页面没有可确认变化", visualScore, packageChanged, treeChanged)
                 }
@@ -127,14 +185,33 @@ class ActionVerifier {
         score: Double,
         packageChanged: Boolean,
         treeChanged: Boolean,
-    ) = VerificationResult(true, message, score, packageChanged, treeChanged)
+        subtaskProgressed: Boolean,
+    ) =
+        VerificationResult(
+            success = true,
+            message = message,
+            visualChangeScore = score,
+            packageChanged = packageChanged,
+            treeChanged = treeChanged,
+            actionSucceeded = true,
+            subtaskProgressed = subtaskProgressed,
+        )
 
     private fun failure(
         message: String,
         score: Double,
         packageChanged: Boolean,
         treeChanged: Boolean,
-    ) = VerificationResult(false, message, score, packageChanged, treeChanged)
+    ) =
+        VerificationResult(
+            success = false,
+            message = message,
+            visualChangeScore = score,
+            packageChanged = packageChanged,
+            treeChanged = treeChanged,
+            actionSucceeded = false,
+            subtaskProgressed = false,
+        )
 
     companion object {
         private const val TAP_VISUAL_THRESHOLD = 0.006
@@ -142,6 +219,7 @@ class ActionVerifier {
         private const val SWIPE_VISUAL_THRESHOLD = 0.01
         private const val BACK_VISUAL_THRESHOLD = 0.008
         private const val LAUNCH_VISUAL_THRESHOLD = 0.015
+        private const val PROGRESS_VISUAL_THRESHOLD = 0.004
 
         fun visualChangeScore(before: IntArray, after: IntArray): Double {
             if (before.isEmpty() || before.size != after.size) return 1.0

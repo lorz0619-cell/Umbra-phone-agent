@@ -24,6 +24,7 @@ interface DecisionModel {
         evidence: String,
         correction: String,
         blockedActions: Set<String>,
+        candidateHints: List<String> = emptyList(),
     ): AgentDecision =
         nextDecision(
             task = task,
@@ -31,6 +32,7 @@ interface DecisionModel {
             history = history,
             feedback =
                 "[REFLECTION] trigger=$trigger；证据：$evidence；纠错要求：$correction；" +
+                    "候选路径：${candidateHints.joinToString(" / ")}；" +
                     "禁止重复：${blockedActions.joinToString()}",
         )
 

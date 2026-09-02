@@ -1,0 +1,1225 @@
+{
+  "schema_version": 1,
+  "name": "benchtask-final-v1",
+  "description": "Benchtask final benchmark suite. Most deterministic tasks repeat 3 times; dynamic tasks repeat 5 times; high-risk tasks repeat once.",
+  "defaults": {
+    "mode": "MAIN_SCREEN",
+    "max_steps": 30,
+    "timeout_seconds": 360,
+    "repetitions": 3
+  },
+  "tasks": [
+    {
+      "id": "main-launch-01",
+      "enabled": true,
+      "category": "launch",
+      "description": "打开QQ · 主屏",
+      "instruction": "打开QQ",
+      "mode": "MAIN_SCREEN",
+      "max_steps": 5,
+      "timeout_seconds": 300,
+      "repetitions": 3,
+      "required_packages": [
+        "com.tencent.mobileqq"
+      ],
+      "notes": "无需人工；保留为最稳定的 L0 启动项。",
+      "oracle": {
+        "terminal_phases": [
+          "COMPLETE"
+        ],
+        "required_actions": [
+          "Launch"
+        ],
+        "package_regex": "^com\\.tencent\\.mobileqq$",
+        "max_steps": 5,
+        "max_reflections": 1,
+        "max_failed_verifications": 1,
+        "manual": false
+      }
+    },
+    {
+      "id": "virtual-launch-02",
+      "enabled": true,
+      "category": "launch",
+      "description": "打开QQ · 虚拟屏",
+      "instruction": "打开QQ",
+      "mode": "VIRTUAL_DISPLAY",
+      "max_steps": 5,
+      "timeout_seconds": 360,
+      "repetitions": 3,
+      "required_packages": [
+        "com.tencent.mobileqq"
+      ],
+      "notes": "无需人工；覆盖虚拟屏 Launch。",
+      "oracle": {
+        "terminal_phases": [
+          "TAKEOVER",
+          "COMPLETE"
+        ],
+        "required_actions": [
+          "Launch"
+        ],
+        "max_steps": 5,
+        "max_reflections": 1,
+        "max_failed_verifications": 1,
+        "manual": false
+      }
+    },
+    {
+      "id": "main-launch-03",
+      "enabled": true,
+      "category": "launch",
+      "description": "打开扣扣 · 主屏",
+      "instruction": "打开扣扣",
+      "mode": "MAIN_SCREEN",
+      "max_steps": 5,
+      "timeout_seconds": 300,
+      "repetitions": 3,
+      "required_packages": [
+        "com.tencent.mobileqq"
+      ],
+      "notes": "与打开QQ语义重复，最终集保留用于别名解析。",
+      "oracle": {
+        "terminal_phases": [
+          "COMPLETE"
+        ],
+        "required_actions": [
+          "Launch"
+        ],
+        "package_regex": "^com\\.tencent\\.mobileqq$",
+        "max_steps": 5,
+        "max_reflections": 1,
+        "max_failed_verifications": 1,
+        "manual": false
+      }
+    },
+    {
+      "id": "virtual-launch-04",
+      "enabled": true,
+      "category": "launch",
+      "description": "打开扣扣 · 虚拟屏",
+      "instruction": "打开扣扣",
+      "mode": "VIRTUAL_DISPLAY",
+      "max_steps": 5,
+      "timeout_seconds": 360,
+      "repetitions": 3,
+      "required_packages": [
+        "com.tencent.mobileqq"
+      ],
+      "notes": "建议与主屏版成对统计一致性。",
+      "oracle": {
+        "terminal_phases": [
+          "TAKEOVER",
+          "COMPLETE"
+        ],
+        "required_actions": [
+          "Launch"
+        ],
+        "max_steps": 5,
+        "max_reflections": 1,
+        "max_failed_verifications": 1,
+        "manual": false
+      }
+    },
+    {
+      "id": "main-camera-05",
+      "enabled": true,
+      "category": "camera",
+      "description": "打开相机准备拍照 · 主屏",
+      "instruction": "打开相机准备拍照",
+      "mode": "MAIN_SCREEN",
+      "max_steps": 6,
+      "timeout_seconds": 300,
+      "repetitions": 3,
+      "notes": "需要人工确认相机界面且无快门副作用。",
+      "oracle": {
+        "terminal_phases": [
+          "COMPLETE"
+        ],
+        "max_steps": 6,
+        "max_reflections": 1,
+        "max_failed_verifications": 1,
+        "manual": true,
+        "manual_prompt": "相机是否已打开拍照界面，并且没有实际拍照？"
+      }
+    },
+    {
+      "id": "virtual-camera-06",
+      "enabled": true,
+      "category": "camera",
+      "description": "打开相机准备拍照 · 虚拟屏",
+      "instruction": "打开相机准备拍照",
+      "mode": "VIRTUAL_DISPLAY",
+      "max_steps": 6,
+      "timeout_seconds": 360,
+      "repetitions": 3,
+      "notes": "接管后由人工确认没有实际拍摄。",
+      "oracle": {
+        "terminal_phases": [
+          "TAKEOVER",
+          "COMPLETE"
+        ],
+        "max_steps": 6,
+        "max_reflections": 1,
+        "max_failed_verifications": 1,
+        "manual": true,
+        "manual_prompt": "接管后相机是否显示拍照界面，并且没有实际拍照？"
+      }
+    },
+    {
+      "id": "main-camera-07",
+      "enabled": true,
+      "category": "camera",
+      "description": "打开相机准备录像 · 主屏",
+      "instruction": "打开相机准备录像",
+      "mode": "MAIN_SCREEN",
+      "max_steps": 6,
+      "timeout_seconds": 300,
+      "repetitions": 3,
+      "notes": "需要人工确认录像模式且未开始录制。",
+      "oracle": {
+        "terminal_phases": [
+          "COMPLETE"
+        ],
+        "max_steps": 6,
+        "max_reflections": 1,
+        "max_failed_verifications": 1,
+        "manual": true,
+        "manual_prompt": "相机是否已打开录像界面，并且没有实际录像？"
+      }
+    },
+    {
+      "id": "virtual-camera-08",
+      "enabled": true,
+      "category": "camera",
+      "description": "打开相机准备录像 · 虚拟屏",
+      "instruction": "打开相机准备录像",
+      "mode": "VIRTUAL_DISPLAY",
+      "max_steps": 6,
+      "timeout_seconds": 360,
+      "repetitions": 3,
+      "notes": "需要人工确认模式与无副作用。",
+      "oracle": {
+        "terminal_phases": [
+          "TAKEOVER",
+          "COMPLETE"
+        ],
+        "max_steps": 6,
+        "max_reflections": 1,
+        "max_failed_verifications": 1,
+        "manual": true,
+        "manual_prompt": "接管后相机是否显示录像界面，并且没有实际录像？"
+      }
+    },
+    {
+      "id": "main-system-tool-09",
+      "enabled": true,
+      "category": "system-tool",
+      "description": "设置每天早上7点15分的闹钟，标签为 UmbraBench · 主屏",
+      "instruction": "设置每天早上7点15分的闹钟，标签为 UmbraBench",
+      "mode": "MAIN_SCREEN",
+      "max_steps": 6,
+      "timeout_seconds": 300,
+      "repetitions": 3,
+      "notes": "需要人工确认标签、时间且未保存。",
+      "oracle": {
+        "terminal_phases": [
+          "COMPLETE"
+        ],
+        "max_steps": 6,
+        "max_reflections": 1,
+        "max_failed_verifications": 1,
+        "manual": true,
+        "manual_prompt": "闹钟界面是否显示了每天 07:15、标签 UmbraBench，并且没有保存？"
+      }
+    },
+    {
+      "id": "virtual-system-tool-10",
+      "enabled": true,
+      "category": "system-tool",
+      "description": "设置每天早上7点15分的闹钟，标签为 UmbraBench · 虚拟屏",
+      "instruction": "设置每天早上7点15分的闹钟，标签为 UmbraBench",
+      "mode": "VIRTUAL_DISPLAY",
+      "max_steps": 6,
+      "timeout_seconds": 360,
+      "repetitions": 3,
+      "notes": "需要人工确认未保存。",
+      "oracle": {
+        "terminal_phases": [
+          "COMPLETE",
+          "TAKEOVER"
+        ],
+        "max_steps": 6,
+        "max_reflections": 1,
+        "max_failed_verifications": 1,
+        "manual": true,
+        "manual_prompt": "接管后闹钟界面是否正确且没有保存？"
+      }
+    },
+    {
+      "id": "main-system-tool-11",
+      "enabled": true,
+      "category": "system-tool",
+      "description": "创建明天下午3点到3点半的日历事件，标题为 Umbra Benchmark · 主屏",
+      "instruction": "创建明天下午3点到3点半的日历事件，标题为 Umbra Benchmark",
+      "mode": "MAIN_SCREEN",
+      "max_steps": 6,
+      "timeout_seconds": 300,
+      "repetitions": 3,
+      "notes": "需要人工确认标题、时间且未保存。",
+      "oracle": {
+        "terminal_phases": [
+          "COMPLETE"
+        ],
+        "max_steps": 6,
+        "max_reflections": 1,
+        "max_failed_verifications": 1,
+        "manual": true,
+        "manual_prompt": "日历事件是否填写了明天 15:00-15:30、标题 Umbra Benchmark，并且停在保存前？"
+      }
+    },
+    {
+      "id": "virtual-system-tool-12",
+      "enabled": true,
+      "category": "system-tool",
+      "description": "创建明天下午3点到3点半的日历事件，标题为 Umbra Benchmark · 虚拟屏",
+      "instruction": "创建明天下午3点到3点半的日历事件，标题为 Umbra Benchmark",
+      "mode": "VIRTUAL_DISPLAY",
+      "max_steps": 6,
+      "timeout_seconds": 360,
+      "repetitions": 3,
+      "notes": "需要人工确认未保存。",
+      "oracle": {
+        "terminal_phases": [
+          "TAKEOVER",
+          "COMPLETE"
+        ],
+        "max_steps": 6,
+        "max_reflections": 1,
+        "max_failed_verifications": 1,
+        "manual": true,
+        "manual_prompt": "接管后日历事件是否正确且未保存？"
+      }
+    },
+    {
+      "id": "main-system-tool-13",
+      "enabled": true,
+      "category": "system-tool",
+      "description": "导航到上海站一号线一号口 · 主屏",
+      "instruction": "导航到上海站一号线一号口",
+      "mode": "MAIN_SCREEN",
+      "max_steps": 6,
+      "timeout_seconds": 300,
+      "repetitions": 3,
+      "notes": "需要人工核对地图上的地址。",
+      "oracle": {
+        "terminal_phases": [
+          "COMPLETE"
+        ],
+        "max_steps": 6,
+        "max_reflections": 1,
+        "max_failed_verifications": 1,
+        "manual": true,
+        "manual_prompt": "导航是否打开并显示“上海站一号线一号口”？"
+      }
+    },
+    {
+      "id": "virtual-system-tool-14",
+      "enabled": true,
+      "category": "system-tool",
+      "description": "导航到上海站一号线一号口 · 虚拟屏",
+      "instruction": "导航到上海站一号线一号口",
+      "mode": "VIRTUAL_DISPLAY",
+      "max_steps": 6,
+      "timeout_seconds": 360,
+      "repetitions": 3,
+      "notes": "需要人工核对地址。",
+      "oracle": {
+        "terminal_phases": [
+          "TAKEOVER",
+          "COMPLETE"
+        ],
+        "max_steps": 6,
+        "max_reflections": 1,
+        "max_failed_verifications": 1,
+        "manual": true,
+        "manual_prompt": "接管后导航是否显示“上海站一号线一号口”？"
+      }
+    },
+    {
+      "id": "main-system-tool-15",
+      "enabled": true,
+      "category": "system-tool",
+      "description": "导航到离我最近的银行 · 主屏",
+      "instruction": "导航到离我最近的银行",
+      "mode": "MAIN_SCREEN",
+      "max_steps": 6,
+      "timeout_seconds": 300,
+      "repetitions": 3,
+      "notes": "人工只判断导航目标是否合理。",
+      "oracle": {
+        "terminal_phases": [
+          "COMPLETE"
+        ],
+        "max_steps": 6,
+        "max_reflections": 1,
+        "max_failed_verifications": 1,
+        "manual": true,
+        "manual_prompt": "导航是否打开并定位到一家合理的最近银行？"
+      }
+    },
+    {
+      "id": "virtual-system-tool-16",
+      "enabled": true,
+      "category": "system-tool",
+      "description": "导航到离我最近的银行 · 虚拟屏",
+      "instruction": "导航到离我最近的银行",
+      "mode": "VIRTUAL_DISPLAY",
+      "max_steps": 6,
+      "timeout_seconds": 360,
+      "repetitions": 3,
+      "notes": "人工核对目标合理性。",
+      "oracle": {
+        "terminal_phases": [
+          "TAKEOVER",
+          "COMPLETE"
+        ],
+        "max_steps": 6,
+        "max_reflections": 1,
+        "max_failed_verifications": 1,
+        "manual": true,
+        "manual_prompt": "接管后导航是否定位到一家合理的最近银行？"
+      }
+    },
+    {
+      "id": "main-system-tool-17",
+      "enabled": true,
+      "category": "system-tool",
+      "description": "新建联系人 Umbra测试联系人，手机号10000000000 · 主屏",
+      "instruction": "新建联系人 Umbra测试联系人，手机号10000000000",
+      "mode": "MAIN_SCREEN",
+      "max_steps": 7,
+      "timeout_seconds": 300,
+      "repetitions": 3,
+      "notes": "需要人工确认姓名和手机号。",
+      "oracle": {
+        "terminal_phases": [
+          "COMPLETE"
+        ],
+        "max_steps": 7,
+        "max_reflections": 1,
+        "max_failed_verifications": 1,
+        "manual": true,
+        "manual_prompt": "联系人创建界面是否包含 Umbra测试联系人 和 10000000000，并且未保存？"
+      }
+    },
+    {
+      "id": "virtual-system-tool-18",
+      "enabled": true,
+      "category": "system-tool",
+      "description": "新建联系人 Umbra测试联系人，手机号10000000000 · 虚拟屏",
+      "instruction": "新建联系人 Umbra测试联系人，手机号10000000000",
+      "mode": "VIRTUAL_DISPLAY",
+      "max_steps": 7,
+      "timeout_seconds": 360,
+      "repetitions": 3,
+      "notes": "需要人工确认未保存。",
+      "oracle": {
+        "terminal_phases": [
+          "TAKEOVER",
+          "COMPLETE"
+        ],
+        "max_steps": 7,
+        "max_reflections": 1,
+        "max_failed_verifications": 1,
+        "manual": true,
+        "manual_prompt": "接管后联系人信息是否正确且未保存？"
+      }
+    },
+    {
+      "id": "main-system-tool-19",
+      "enabled": true,
+      "category": "system-tool",
+      "description": "给手机号10000000000，编辑短信“[UmbraBench] 固定消息测试，请忽略” · 主屏",
+      "instruction": "给手机号10000000000，编辑短信“[UmbraBench] 固定消息测试，请忽略”",
+      "mode": "MAIN_SCREEN",
+      "max_steps": 7,
+      "timeout_seconds": 300,
+      "repetitions": 3,
+      "notes": "需要人工确认号码、内容且未发送。",
+      "oracle": {
+        "terminal_phases": [
+          "COMPLETE"
+        ],
+        "max_steps": 7,
+        "max_reflections": 1,
+        "max_failed_verifications": 1,
+        "manual": true,
+        "manual_prompt": "短信编辑界面是否包含号码 10000000000 和固定消息，并且未发送？"
+      }
+    },
+    {
+      "id": "virtual-system-tool-20",
+      "enabled": true,
+      "category": "system-tool",
+      "description": "给手机号10000000000，编辑短信“[UmbraBench] 固定消息测试，请忽略” · 虚拟屏",
+      "instruction": "给手机号10000000000，编辑短信“[UmbraBench] 固定消息测试，请忽略”",
+      "mode": "VIRTUAL_DISPLAY",
+      "max_steps": 7,
+      "timeout_seconds": 360,
+      "repetitions": 3,
+      "notes": "需要人工确认未发送。",
+      "oracle": {
+        "terminal_phases": [
+          "TAKEOVER",
+          "COMPLETE"
+        ],
+        "max_steps": 7,
+        "max_reflections": 1,
+        "max_failed_verifications": 1,
+        "manual": true,
+        "manual_prompt": "接管后短信编辑界面是否正确且未发送？"
+      }
+    },
+    {
+      "id": "main-social-navigation-21",
+      "enabled": true,
+      "category": "social-navigation",
+      "description": "打开QQ，进入联系人“我的电脑”的聊天页面 · 主屏",
+      "instruction": "打开QQ，进入联系人“我的电脑”的聊天页面",
+      "mode": "MAIN_SCREEN",
+      "max_steps": 12,
+      "timeout_seconds": 300,
+      "repetitions": 3,
+      "required_packages": [
+        "com.tencent.mobileqq"
+      ],
+      "notes": "需要人工确认页面正确。",
+      "oracle": {
+        "terminal_phases": [
+          "COMPLETE"
+        ],
+        "max_steps": 12,
+        "max_reflections": 2,
+        "max_failed_verifications": 2,
+        "manual": true,
+        "manual_prompt": "QQ 是否进入“我的电脑”聊天页面？"
+      }
+    },
+    {
+      "id": "virtual-social-navigation-22",
+      "enabled": true,
+      "category": "social-navigation",
+      "description": "打开QQ，进入联系人“我的电脑”的聊天页面 · 虚拟屏",
+      "instruction": "打开QQ，进入联系人“我的电脑”的聊天页面",
+      "mode": "VIRTUAL_DISPLAY",
+      "max_steps": 12,
+      "timeout_seconds": 360,
+      "repetitions": 3,
+      "required_packages": [
+        "com.tencent.mobileqq"
+      ],
+      "notes": "需要人工确认页面。",
+      "oracle": {
+        "terminal_phases": [
+          "COMPLETE",
+          "TAKEOVER"
+        ],
+        "max_steps": 12,
+        "max_reflections": 2,
+        "max_failed_verifications": 2,
+        "manual": true,
+        "manual_prompt": "接管后 QQ 是否进入“我的电脑”聊天页面？"
+      }
+    },
+    {
+      "id": "main-social-message-23",
+      "enabled": true,
+      "category": "social-message",
+      "description": "给QQ联系人“我的电脑”发送“[UmbraBench] 固定消息测试，请忽略” · 主屏",
+      "instruction": "给QQ联系人“我的电脑”发送“[UmbraBench] 固定消息测试，请忽略”",
+      "mode": "MAIN_SCREEN",
+      "max_steps": 18,
+      "timeout_seconds": 300,
+      "repetitions": 3,
+      "required_packages": [
+        "com.tencent.mobileqq"
+      ],
+      "notes": "需要人工确认消息准确且只发送一次。",
+      "oracle": {
+        "terminal_phases": [
+          "COMPLETE"
+        ],
+        "max_steps": 18,
+        "max_reflections": 3,
+        "max_failed_verifications": 3,
+        "manual": true,
+        "manual_prompt": "QQ 是否已成功向“我的电脑”发送固定消息，并且只发送一次？"
+      }
+    },
+    {
+      "id": "virtual-social-message-24",
+      "enabled": true,
+      "category": "social-message",
+      "description": "给QQ联系人“我的电脑”发送“[UmbraBench] 固定消息测试，请忽略”（主屏未激活输入法） · 虚拟屏",
+      "instruction": "给QQ联系人“我的电脑”发送“[UmbraBench] 固定消息测试，请忽略”（主屏未激活输入法）",
+      "mode": "VIRTUAL_DISPLAY",
+      "max_steps": 18,
+      "timeout_seconds": 360,
+      "repetitions": 3,
+      "required_packages": [
+        "com.tencent.mobileqq"
+      ],
+      "notes": "需要人工确认消息；前置条件是主屏 IME 未激活。",
+      "oracle": {
+        "terminal_phases": [
+          "COMPLETE",
+          "TAKEOVER"
+        ],
+        "max_steps": 18,
+        "max_reflections": 3,
+        "max_failed_verifications": 3,
+        "manual": true,
+        "manual_prompt": "虚拟屏任务是否成功发送固定消息，并且主屏输入法始终未激活？"
+      }
+    },
+    {
+      "id": "virtual-social-message-25",
+      "enabled": true,
+      "category": "social-message",
+      "description": "给QQ联系人“我的电脑”发送“[UmbraBench] 固定消息测试，请忽略”（主屏激活输入法） · 虚拟屏",
+      "instruction": "给QQ联系人“我的电脑”发送“[UmbraBench] 固定消息测试，请忽略”（主屏激活输入法）",
+      "mode": "VIRTUAL_DISPLAY",
+      "max_steps": 20,
+      "timeout_seconds": 360,
+      "repetitions": 3,
+      "required_packages": [
+        "com.tencent.mobileqq"
+      ],
+      "notes": "需要人工同时观察消息结果与主屏 IME 是否被打断。",
+      "oracle": {
+        "terminal_phases": [
+          "COMPLETE",
+          "TAKEOVER"
+        ],
+        "max_steps": 20,
+        "max_reflections": 3,
+        "max_failed_verifications": 3,
+        "manual": true,
+        "manual_prompt": "虚拟屏任务是否成功发送固定消息，且没有打断主屏已激活的输入法？"
+      }
+    },
+    {
+      "id": "main-social-message-26",
+      "enabled": true,
+      "category": "social-message",
+      "description": "给QQ联系人“我的电脑”写一句不超过20个字的生日祝福并发送 · 主屏",
+      "instruction": "给QQ联系人“我的电脑”写一句不超过20个字的生日祝福并发送",
+      "mode": "MAIN_SCREEN",
+      "max_steps": 20,
+      "timeout_seconds": 300,
+      "repetitions": 3,
+      "required_packages": [
+        "com.tencent.mobileqq"
+      ],
+      "notes": "需要人工确认已发送且字数不超过 20。",
+      "oracle": {
+        "terminal_phases": [
+          "COMPLETE"
+        ],
+        "max_steps": 20,
+        "max_reflections": 3,
+        "max_failed_verifications": 3,
+        "manual": true,
+        "manual_prompt": "QQ 是否已发送生日祝福，且文字不超过 20 个字？"
+      }
+    },
+    {
+      "id": "virtual-social-message-27",
+      "enabled": true,
+      "category": "social-message",
+      "description": "给QQ联系人“我的电脑”写一句不超过20个字的生日祝福并发送 · 虚拟屏",
+      "instruction": "给QQ联系人“我的电脑”写一句不超过20个字的生日祝福并发送",
+      "mode": "VIRTUAL_DISPLAY",
+      "max_steps": 20,
+      "timeout_seconds": 360,
+      "repetitions": 3,
+      "required_packages": [
+        "com.tencent.mobileqq"
+      ],
+      "notes": "需要人工确认字数与发送结果。",
+      "oracle": {
+        "terminal_phases": [
+          "COMPLETE",
+          "TAKEOVER"
+        ],
+        "max_steps": 20,
+        "max_reflections": 3,
+        "max_failed_verifications": 3,
+        "manual": true,
+        "manual_prompt": "虚拟屏是否已发送生日祝福，且文字不超过 20 个字？"
+      }
+    },
+    {
+      "id": "main-file-28",
+      "enabled": true,
+      "category": "file",
+      "description": "在手机存储中找到 Download 里的 umbra-benchmark.txt · 主屏",
+      "instruction": "在手机存储中找到 Download 里的 umbra-benchmark.txt",
+      "mode": "MAIN_SCREEN",
+      "max_steps": 8,
+      "timeout_seconds": 300,
+      "repetitions": 3,
+      "notes": "需要人工确认找到了正确文件。建议预置脚本先推文件。",
+      "oracle": {
+        "terminal_phases": [
+          "COMPLETE"
+        ],
+        "max_steps": 8,
+        "max_reflections": 2,
+        "max_failed_verifications": 2,
+        "manual": true,
+        "manual_prompt": "是否在 Download 中定位到了 umbra-benchmark.txt？"
+      }
+    },
+    {
+      "id": "virtual-file-29",
+      "enabled": true,
+      "category": "file",
+      "description": "在手机存储中找到 Download 里的 umbra-benchmark.txt · 虚拟屏",
+      "instruction": "在手机存储中找到 Download 里的 umbra-benchmark.txt",
+      "mode": "VIRTUAL_DISPLAY",
+      "max_steps": 8,
+      "timeout_seconds": 360,
+      "repetitions": 3,
+      "notes": "需要人工确认文件。",
+      "oracle": {
+        "terminal_phases": [
+          "COMPLETE",
+          "TAKEOVER"
+        ],
+        "max_steps": 8,
+        "max_reflections": 2,
+        "max_failed_verifications": 2,
+        "manual": true,
+        "manual_prompt": "接管后是否在虚拟屏文件管理器中定位到了 umbra-benchmark.txt？"
+      }
+    },
+    {
+      "id": "main-music-30",
+      "enabled": true,
+      "category": "music",
+      "description": "在网易云音乐中打开每日推荐的第一首歌，打开正确歌曲的详情页 · 主屏",
+      "instruction": "在网易云音乐中打开每日推荐的第一首歌，打开正确歌曲的详情页",
+      "mode": "MAIN_SCREEN",
+      "max_steps": 12,
+      "timeout_seconds": 300,
+      "repetitions": 5,
+      "required_packages": [
+        "com.netease.cloudmusic"
+      ],
+      "notes": "需要人工对照运行当时的每日推荐第一首。",
+      "oracle": {
+        "terminal_phases": [
+          "COMPLETE"
+        ],
+        "max_steps": 12,
+        "max_reflections": 3,
+        "max_failed_verifications": 3,
+        "manual": true,
+        "manual_prompt": "是否打开的是每日推荐第一首歌的正确详情页？"
+      }
+    },
+    {
+      "id": "virtual-music-31",
+      "enabled": true,
+      "category": "music",
+      "description": "在网易云音乐中打开每日推荐的第一首歌，打开正确歌曲的详情页 · 虚拟屏",
+      "instruction": "在网易云音乐中打开每日推荐的第一首歌，打开正确歌曲的详情页",
+      "mode": "VIRTUAL_DISPLAY",
+      "max_steps": 12,
+      "timeout_seconds": 360,
+      "repetitions": 5,
+      "required_packages": [
+        "com.netease.cloudmusic"
+      ],
+      "notes": "需要人工对照当前推荐。",
+      "oracle": {
+        "terminal_phases": [
+          "COMPLETE",
+          "TAKEOVER"
+        ],
+        "max_steps": 12,
+        "max_reflections": 3,
+        "max_failed_verifications": 3,
+        "manual": true,
+        "manual_prompt": "接管后是否打开的是每日推荐第一首歌的正确详情页？"
+      }
+    },
+    {
+      "id": "main-music-32",
+      "enabled": true,
+      "category": "music",
+      "description": "在网易云音乐中打开每日推荐的第一首歌，打开正确歌曲的详情页，并播放 · 主屏",
+      "instruction": "在网易云音乐中打开每日推荐的第一首歌，打开正确歌曲的详情页，并播放",
+      "mode": "MAIN_SCREEN",
+      "max_steps": 15,
+      "timeout_seconds": 300,
+      "repetitions": 5,
+      "required_packages": [
+        "com.netease.cloudmusic"
+      ],
+      "notes": "需要人工听/看播放状态。",
+      "oracle": {
+        "terminal_phases": [
+          "COMPLETE"
+        ],
+        "max_steps": 15,
+        "max_reflections": 3,
+        "max_failed_verifications": 3,
+        "manual": true,
+        "manual_prompt": "是否正确播放了每日推荐第一首歌？"
+      }
+    },
+    {
+      "id": "virtual-music-33",
+      "enabled": true,
+      "category": "music",
+      "description": "在网易云音乐中打开每日推荐的第一首歌，打开正确歌曲的详情页，并播放 · 虚拟屏",
+      "instruction": "在网易云音乐中打开每日推荐的第一首歌，打开正确歌曲的详情页，并播放",
+      "mode": "VIRTUAL_DISPLAY",
+      "max_steps": 15,
+      "timeout_seconds": 360,
+      "repetitions": 5,
+      "required_packages": [
+        "com.netease.cloudmusic"
+      ],
+      "notes": "需要人工确认播放。",
+      "oracle": {
+        "terminal_phases": [
+          "COMPLETE",
+          "TAKEOVER"
+        ],
+        "max_steps": 15,
+        "max_reflections": 3,
+        "max_failed_verifications": 3,
+        "manual": true,
+        "manual_prompt": "接管后是否正确播放了每日推荐第一首歌？"
+      }
+    },
+    {
+      "id": "main-music-34",
+      "enabled": true,
+      "category": "music",
+      "description": "在网易云音乐中打开每日推荐的第一首歌，打开正确歌曲的详情页，在评论框输入“[UmbraBench] 评论草稿” · 主屏",
+      "instruction": "在网易云音乐中打开每日推荐的第一首歌，打开正确歌曲的详情页，在评论框输入“[UmbraBench] 评论草稿”",
+      "mode": "MAIN_SCREEN",
+      "max_steps": 18,
+      "timeout_seconds": 300,
+      "repetitions": 5,
+      "required_packages": [
+        "com.netease.cloudmusic"
+      ],
+      "notes": "需要人工确认草稿且未发布。",
+      "oracle": {
+        "terminal_phases": [
+          "COMPLETE"
+        ],
+        "max_steps": 18,
+        "max_reflections": 3,
+        "max_failed_verifications": 3,
+        "manual": true,
+        "manual_prompt": "评论框是否输入了“[UmbraBench] 评论草稿”，并且没有发布评论？"
+      }
+    },
+    {
+      "id": "virtual-music-35",
+      "enabled": true,
+      "category": "music",
+      "description": "在网易云音乐中打开每日推荐的第一首歌，打开正确歌曲的详情页，在评论框输入“[UmbraBench] 评论草稿” · 虚拟屏",
+      "instruction": "在网易云音乐中打开每日推荐的第一首歌，打开正确歌曲的详情页，在评论框输入“[UmbraBench] 评论草稿”",
+      "mode": "VIRTUAL_DISPLAY",
+      "max_steps": 18,
+      "timeout_seconds": 360,
+      "repetitions": 5,
+      "required_packages": [
+        "com.netease.cloudmusic"
+      ],
+      "notes": "需要人工确认未发布。",
+      "oracle": {
+        "terminal_phases": [
+          "COMPLETE",
+          "TAKEOVER"
+        ],
+        "max_steps": 18,
+        "max_reflections": 3,
+        "max_failed_verifications": 3,
+        "manual": true,
+        "manual_prompt": "接管后评论框是否正确且未发布？"
+      }
+    },
+    {
+      "id": "main-video-search-36",
+      "enabled": true,
+      "category": "video-search",
+      "description": "在哔哩哔哩搜索“Android 无障碍开发”，停在搜索结果页面 · 主屏",
+      "instruction": "在哔哩哔哩搜索“Android 无障碍开发”，停在搜索结果页面",
+      "mode": "MAIN_SCREEN",
+      "max_steps": 10,
+      "timeout_seconds": 300,
+      "repetitions": 3,
+      "required_packages": [
+        "tv.danmaku.bili"
+      ],
+      "notes": "需要人工确认关键词与结果页。",
+      "oracle": {
+        "terminal_phases": [
+          "COMPLETE"
+        ],
+        "max_steps": 10,
+        "max_reflections": 2,
+        "max_failed_verifications": 2,
+        "manual": true,
+        "manual_prompt": "哔哩哔哩是否停在“Android 无障碍开发”搜索结果页？"
+      }
+    },
+    {
+      "id": "virtual-video-search-37",
+      "enabled": true,
+      "category": "video-search",
+      "description": "在哔哩哔哩搜索“Android 无障碍开发”，停在搜索结果页面 · 虚拟屏",
+      "instruction": "在哔哩哔哩搜索“Android 无障碍开发”，停在搜索结果页面",
+      "mode": "VIRTUAL_DISPLAY",
+      "max_steps": 10,
+      "timeout_seconds": 360,
+      "repetitions": 3,
+      "required_packages": [
+        "tv.danmaku.bili"
+      ],
+      "notes": "需要人工确认结果页。",
+      "oracle": {
+        "terminal_phases": [
+          "COMPLETE",
+          "TAKEOVER"
+        ],
+        "max_steps": 10,
+        "max_reflections": 2,
+        "max_failed_verifications": 2,
+        "manual": true,
+        "manual_prompt": "接管后是否停在“Android 无障碍开发”搜索结果页？"
+      }
+    },
+    {
+      "id": "main-video-search-38",
+      "enabled": true,
+      "category": "video-search",
+      "description": "在哔哩哔哩搜索“Android 无障碍开发”，停在搜索结果页面，打开播放量最高的视频 · 主屏",
+      "instruction": "在哔哩哔哩搜索“Android 无障碍开发”，停在搜索结果页面，打开播放量最高的视频",
+      "mode": "MAIN_SCREEN",
+      "max_steps": 15,
+      "timeout_seconds": 300,
+      "repetitions": 5,
+      "required_packages": [
+        "tv.danmaku.bili"
+      ],
+      "notes": "需要人工对照当前排序。",
+      "oracle": {
+        "terminal_phases": [
+          "COMPLETE"
+        ],
+        "max_steps": 15,
+        "max_reflections": 3,
+        "max_failed_verifications": 3,
+        "manual": true,
+        "manual_prompt": "是否打开了当前播放量最高的视频？"
+      }
+    },
+    {
+      "id": "virtual-video-search-39",
+      "enabled": true,
+      "category": "video-search",
+      "description": "在哔哩哔哩搜索“Android 无障碍开发”，停在搜索结果页面，打开播放量最高的视频 · 虚拟屏",
+      "instruction": "在哔哩哔哩搜索“Android 无障碍开发”，停在搜索结果页面，打开播放量最高的视频",
+      "mode": "VIRTUAL_DISPLAY",
+      "max_steps": 15,
+      "timeout_seconds": 360,
+      "repetitions": 5,
+      "required_packages": [
+        "tv.danmaku.bili"
+      ],
+      "notes": "需要人工对照当前排序。",
+      "oracle": {
+        "terminal_phases": [
+          "COMPLETE",
+          "TAKEOVER"
+        ],
+        "max_steps": 15,
+        "max_reflections": 3,
+        "max_failed_verifications": 3,
+        "manual": true,
+        "manual_prompt": "接管后是否打开了当前播放量最高的视频？"
+      }
+    },
+    {
+      "id": "main-game-40",
+      "enabled": true,
+      "category": "game",
+      "description": "打开明日方舟 · 主屏",
+      "instruction": "打开明日方舟",
+      "mode": "MAIN_SCREEN",
+      "max_steps": 8,
+      "timeout_seconds": 300,
+      "repetitions": 3,
+      "required_packages": [
+        "com.hypergryph.arknights"
+      ],
+      "notes": "需要人工确认进入游戏载入。",
+      "oracle": {
+        "terminal_phases": [
+          "COMPLETE"
+        ],
+        "max_steps": 8,
+        "max_reflections": 2,
+        "max_failed_verifications": 2,
+        "manual": true,
+        "manual_prompt": "明日方舟是否进入载入界面？"
+      }
+    },
+    {
+      "id": "virtual-game-41",
+      "enabled": true,
+      "category": "game",
+      "description": "打开明日方舟 · 虚拟屏",
+      "instruction": "打开明日方舟",
+      "mode": "VIRTUAL_DISPLAY",
+      "max_steps": 8,
+      "timeout_seconds": 360,
+      "repetitions": 3,
+      "required_packages": [
+        "com.hypergryph.arknights"
+      ],
+      "notes": "需要人工确认载入。",
+      "oracle": {
+        "terminal_phases": [
+          "COMPLETE",
+          "TAKEOVER"
+        ],
+        "max_steps": 8,
+        "max_reflections": 2,
+        "max_failed_verifications": 2,
+        "manual": true,
+        "manual_prompt": "接管后明日方舟是否进入载入界面？"
+      }
+    },
+    {
+      "id": "main-browser-42",
+      "enabled": true,
+      "category": "browser",
+      "description": "打开浏览器，并搜索”umbra“ · 主屏",
+      "instruction": "打开浏览器，并搜索”umbra“",
+      "mode": "MAIN_SCREEN",
+      "max_steps": 10,
+      "timeout_seconds": 300,
+      "repetitions": 3,
+      "notes": "需要人工确认搜索词和结果页。",
+      "oracle": {
+        "terminal_phases": [
+          "COMPLETE"
+        ],
+        "max_steps": 10,
+        "max_reflections": 2,
+        "max_failed_verifications": 2,
+        "manual": true,
+        "manual_prompt": "浏览器是否显示“umbra”搜索结果页？"
+      }
+    },
+    {
+      "id": "virtual-browser-43",
+      "enabled": true,
+      "category": "browser",
+      "description": "打开浏览器，并搜索”umbra“ · 虚拟屏",
+      "instruction": "打开浏览器，并搜索”umbra“",
+      "mode": "VIRTUAL_DISPLAY",
+      "max_steps": 10,
+      "timeout_seconds": 360,
+      "repetitions": 3,
+      "notes": "需要人工确认结果页。",
+      "oracle": {
+        "terminal_phases": [
+          "COMPLETE",
+          "TAKEOVER"
+        ],
+        "max_steps": 10,
+        "max_reflections": 2,
+        "max_failed_verifications": 2,
+        "manual": true,
+        "manual_prompt": "接管后浏览器是否显示“umbra”搜索结果页？"
+      }
+    },
+    {
+      "id": "main-browser-44",
+      "enabled": true,
+      "category": "browser",
+      "description": "打开浏览器，并搜索”umbra“并进入第一个推荐项 · 主屏",
+      "instruction": "打开浏览器，并搜索”umbra“并进入第一个推荐项",
+      "mode": "MAIN_SCREEN",
+      "max_steps": 15,
+      "timeout_seconds": 300,
+      "repetitions": 5,
+      "notes": "需要人工确认进入了第一条结果。",
+      "oracle": {
+        "terminal_phases": [
+          "COMPLETE"
+        ],
+        "max_steps": 15,
+        "max_reflections": 3,
+        "max_failed_verifications": 3,
+        "manual": true,
+        "manual_prompt": "浏览器是否进入了第一个推荐项？"
+      }
+    },
+    {
+      "id": "virtual-browser-45",
+      "enabled": true,
+      "category": "browser",
+      "description": "打开浏览器，并搜索”umbra“并进入第一个推荐项 · 虚拟屏",
+      "instruction": "打开浏览器，并搜索”umbra“并进入第一个推荐项",
+      "mode": "VIRTUAL_DISPLAY",
+      "max_steps": 15,
+      "timeout_seconds": 360,
+      "repetitions": 5,
+      "notes": "需要人工确认。",
+      "oracle": {
+        "terminal_phases": [
+          "COMPLETE",
+          "TAKEOVER"
+        ],
+        "max_steps": 15,
+        "max_reflections": 3,
+        "max_failed_verifications": 3,
+        "manual": true,
+        "manual_prompt": "接管后浏览器是否进入了第一个推荐项？"
+      }
+    },
+    {
+      "id": "main-notes-46",
+      "enabled": true,
+      "category": "notes",
+      "description": "打开便签，创建新便签，并输入”[UmbraBench] 固定文字测试“ · 主屏",
+      "instruction": "打开便签，创建新便签，并输入”[UmbraBench] 固定文字测试“",
+      "mode": "MAIN_SCREEN",
+      "max_steps": 12,
+      "timeout_seconds": 300,
+      "repetitions": 3,
+      "notes": "需要人工确认便签存在且内容正确。",
+      "oracle": {
+        "terminal_phases": [
+          "COMPLETE"
+        ],
+        "max_steps": 12,
+        "max_reflections": 3,
+        "max_failed_verifications": 3,
+        "manual": true,
+        "manual_prompt": "便签是否创建成功且内容为“[UmbraBench] 固定文字测试”？"
+      }
+    },
+    {
+      "id": "virtual-notes-47",
+      "enabled": true,
+      "category": "notes",
+      "description": "打开便签，创建新便签，并输入”[UmbraBench] 固定文字测试“（主屏未激活输入法） · 虚拟屏",
+      "instruction": "打开便签，创建新便签，并输入”[UmbraBench] 固定文字测试“（主屏未激活输入法）",
+      "mode": "VIRTUAL_DISPLAY",
+      "max_steps": 12,
+      "timeout_seconds": 360,
+      "repetitions": 3,
+      "notes": "需要人工确认内容；前置 IME 未激活。",
+      "oracle": {
+        "terminal_phases": [
+          "COMPLETE",
+          "TAKEOVER"
+        ],
+        "max_steps": 12,
+        "max_reflections": 3,
+        "max_failed_verifications": 3,
+        "manual": true,
+        "manual_prompt": "虚拟屏便签是否创建成功且内容正确，并保持主屏输入法未激活？"
+      }
+    },
+    {
+      "id": "virtual-notes-48",
+      "enabled": true,
+      "category": "notes",
+      "description": "打开便签，创建新便签，并输入”[UmbraBench] 固定文字测试“（主屏激活输入法） · 虚拟屏",
+      "instruction": "打开便签，创建新便签，并输入”[UmbraBench] 固定文字测试“（主屏激活输入法）",
+      "mode": "VIRTUAL_DISPLAY",
+      "max_steps": 12,
+      "timeout_seconds": 360,
+      "repetitions": 3,
+      "notes": "需要人工确认内容与主屏输入法状态。",
+      "oracle": {
+        "terminal_phases": [
+          "COMPLETE",
+          "TAKEOVER"
+        ],
+        "max_steps": 12,
+        "max_reflections": 3,
+        "max_failed_verifications": 3,
+        "manual": true,
+        "manual_prompt": "虚拟屏便签是否创建成功且内容正确，且没有打断主屏已激活的输入法？"
+      }
+    },
+    {
+      "id": "main-commerce-49",
+      "enabled": true,
+      "category": "commerce",
+      "description": "打开美团，点一杯霸王茶姬的大杯伯牙绝弦，外卖到默认地址 · 主屏",
+      "instruction": "打开美团，点一杯霸王茶姬的大杯伯牙绝弦，外卖到默认地址",
+      "mode": "MAIN_SCREEN",
+      "max_steps": 30,
+      "timeout_seconds": 300,
+      "repetitions": 1,
+      "required_packages": [
+        "com.sankuai.meituan"
+      ],
+      "notes": "需要人工确认商品/规格/地址和付款页；建议使用无支付方式或测试账号。",
+      "oracle": {
+        "terminal_phases": [
+          "TAKEOVER",
+          "COMPLETE"
+        ],
+        "max_steps": 30,
+        "max_reflections": 4,
+        "max_failed_verifications": 4,
+        "manual": true,
+        "manual_prompt": "美团是否选中霸王茶姬大杯伯牙绝弦并停在付款界面？"
+      }
+    },
+    {
+      "id": "virtual-commerce-50",
+      "enabled": true,
+      "category": "commerce",
+      "description": "打开美团，点一杯霸王茶姬的大杯伯牙绝弦，外卖到默认地址 · 虚拟屏",
+      "instruction": "打开美团，点一杯霸王茶姬的大杯伯牙绝弦，外卖到默认地址",
+      "mode": "VIRTUAL_DISPLAY",
+      "max_steps": 30,
+      "timeout_seconds": 360,
+      "repetitions": 1,
+      "required_packages": [
+        "com.sankuai.meituan"
+      ],
+      "notes": "需要人工确认没有跳转出付款界面或发生支付。",
+      "oracle": {
+        "terminal_phases": [
+          "TAKEOVER",
+          "COMPLETE"
+        ],
+        "max_steps": 30,
+        "max_reflections": 4,
+        "max_failed_verifications": 4,
+        "manual": true,
+        "manual_prompt": "接管后是否选中霸王茶姬大杯伯牙绝弦并停在付款界面，未发生支付？"
+      }
+    }
+  ]
+}

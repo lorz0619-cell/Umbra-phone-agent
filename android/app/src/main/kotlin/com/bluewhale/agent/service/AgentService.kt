@@ -71,10 +71,12 @@ class AgentService : AccessibilityService() {
         const val EXTRA_MODEL = "model"
         const val EXTRA_MAX_STEPS = "max_steps"
         const val EXTRA_CONVERSATION_CONTEXT = "conversation_context"
+        const val EXTRA_BENCHMARK_RUN_ID = "benchmark_run_id"
         const val REMOTE_INPUT_COMMAND = "notification_command"
         const val EXTRA_DIRECT_COMMAND = "direct_notification_command"
 
         private const val CHANNEL_ID = "bluewhale_agent"
+        private const val TAKEOVER_CHANNEL_ID = "bluewhale_agent_takeover"
         private const val NOTIFICATION_ID = 1001
 
         val state = MutableStateFlow(AgentRunState())
@@ -86,20 +88,25 @@ class AgentService : AccessibilityService() {
             mode: TargetMode,
             config: VlmConfig,
             maxSteps: Int = config.maxSteps,
+            benchmarkRunId: String? = null,
         ) {
             val conversationContext =
-                buildString {
-                    TaskMemoryStore.recentPrompt().takeIf { it.isNotBlank() }?.let {
-                        appendLine(it)
+                if (benchmarkRunId.isNullOrBlank()) {
+                    buildString {
+                        TaskMemoryStore.recentPrompt().takeIf { it.isNotBlank() }?.let {
+                            appendLine(it)
+                        }
+                        appendLine("相关会话上下文：")
+                        append(
+                            ConversationStore.recent(12).joinToString("\n") { message ->
+                                val role =
+                                    if (message.role == ConversationRole.USER) "用户" else "Umbra"
+                                "$role：${message.text}"
+                            },
+                        )
                     }
-                    appendLine("相关会话上下文：")
-                    append(
-                        ConversationStore.recent(12).joinToString("\n") { message ->
-                            val role =
-                                if (message.role == ConversationRole.USER) "用户" else "Umbra"
-                            "$role：${message.text}"
-                        },
-                    )
+                } else {
+                    ""
                 }
             val intent =
                 Intent(context, AgentService::class.java)
@@ -111,6 +118,7 @@ class AgentService : AccessibilityService() {
                     .putExtra(EXTRA_MODEL, config.model)
                     .putExtra(EXTRA_MAX_STEPS, maxSteps)
                     .putExtra(EXTRA_CONVERSATION_CONTEXT, conversationContext)
+                    .putExtra(EXTRA_BENCHMARK_RUN_ID, benchmarkRunId.orEmpty())
             ContextCompat.startForegroundService(context, intent)
         }
 
@@ -140,6 +148,7 @@ class AgentService : AccessibilityService() {
     private var pendingStart: Intent? = null
     private var runGeneration: Long = 0L
     private var pendingTakeoverPlatform: VirtualDisplayAgentPlatform? = null
+    private var takeoverRequestActive: Boolean = false
 
     override fun onCreate() {
         super.onCreate()
@@ -201,6 +210,7 @@ class AgentService : AccessibilityService() {
 
         val task = intent.getStringExtra(EXTRA_TASK).orEmpty()
         val conversationContext = intent.getStringExtra(EXTRA_CONVERSATION_CONTEXT).orEmpty()
+        val benchmarkRunId = intent.getStringExtra(EXTRA_BENCHMARK_RUN_ID).orEmpty()
         val mode =
             runCatching { TargetMode.valueOf(intent.getStringExtra(EXTRA_MODE).orEmpty()) }
                 .getOrDefault(TargetMode.MAIN_SCREEN)
@@ -232,7 +242,7 @@ class AgentService : AccessibilityService() {
                 setPreview(null)
                 val finalMessage =
                     try {
-                        runTask(task, mode, config, conversationContext, runId)
+                        runTask(task, mode, config, conversationContext, runId, benchmarkRunId)
                     } catch (_: CancellationException) {
                         "已停止"
                     } catch (error: Exception) {
@@ -258,10 +268,12 @@ class AgentService : AccessibilityService() {
                     state.value.phase == com.bluewhale.agent.model.AgentPhase.FAILED ||
                         finalMessage.contains("失败") ||
                         finalMessage.contains("熔断")
-                ConversationStore.appendAssistant(
-                    finalMessage,
-                    if (isError) ConversationKind.ERROR else ConversationKind.TASK,
-                )
+                if (benchmarkRunId.isBlank()) {
+                    ConversationStore.appendAssistant(
+                        finalMessage,
+                        if (isError) ConversationKind.ERROR else ConversationKind.TASK,
+                    )
+                }
                 job = null
                 stopForeground(android.app.Service.STOP_FOREGROUND_DETACH)
                 if (state.value.awaitingTakeover) {
@@ -279,6 +291,7 @@ class AgentService : AccessibilityService() {
         config: VlmConfig,
         conversationContext: String,
         runId: Long,
+        benchmarkRunId: String,
     ): String {
         val platform: AgentPlatform =
             when (mode) {
@@ -335,7 +348,19 @@ class AgentService : AccessibilityService() {
                                 )
                             }
                         },
-                        onTrace = AgentLogcat::write,
+                        onTrace = { event ->
+                            AgentLogcat.write(
+                                if (benchmarkRunId.isBlank()) {
+                                    event
+                                } else {
+                                    event.copy(
+                                        fields =
+                                            event.fields +
+                                                ("benchmark_run_id" to benchmarkRunId),
+                                    )
+                                },
+                            )
+                        },
                     )
                     val result = graph.run()
                     if (
@@ -343,8 +368,9 @@ class AgentService : AccessibilityService() {
                         platform is VirtualDisplayAgentPlatform
                     ) {
                         pendingTakeoverPlatform = platform
+                        platform.pauseForTakeover()
                     }
-                    if (runId == runGeneration) {
+                    if (runId == runGeneration && benchmarkRunId.isBlank()) {
                         TaskMemoryStore.record(
                             task = task,
                             mode = mode,
@@ -388,80 +414,102 @@ class AgentService : AccessibilityService() {
     }
 
     private fun approveTakeover() {
+        if (takeoverRequestActive) return
         val platform = pendingTakeoverPlatform
         if (platform == null) {
             publishIdleNotification("没有等待接管的虚拟屏任务")
             return
         }
+        takeoverRequestActive = true
         pendingTakeoverPlatform = null
         scope.launch {
-            val result =
-                try {
-                    platform.handoffToMainScreen()
-                } catch (error: Exception) {
-                    com.bluewhale.agent.model.ActionResult.Failure(
-                        error.message ?: "接管迁移失败",
-                        error,
+            try {
+                val result =
+                    try {
+                        platform.handoffToMainScreen()
+                    } catch (error: Exception) {
+                        com.bluewhale.agent.model.ActionResult.Failure(
+                            error.message ?: "接管迁移失败",
+                            error,
+                        )
+                    }
+                val message =
+                    when (result) {
+                        is com.bluewhale.agent.model.ActionResult.Success -> result.message
+                        is com.bluewhale.agent.model.ActionResult.Failure -> result.message
+                    }
+                if (result is com.bluewhale.agent.model.ActionResult.Success) {
+                    ConversationStore.appendAssistant(message, ConversationKind.TASK)
+                    updateRunState(
+                        state.value.copy(
+                            running = false,
+                            phase = com.bluewhale.agent.model.AgentPhase.COMPLETE,
+                            awaitingTakeover = false,
+                            status = message,
+                        ),
+                    )
+                    platform.stop()
+                    setPreview(null)
+                    stopForeground(android.app.Service.STOP_FOREGROUND_DETACH)
+                    publishIdleNotification(message)
+                } else {
+                    ConversationStore.appendAssistant(message, ConversationKind.ERROR)
+                    pendingTakeoverPlatform = platform
+                    updateRunState(
+                        state.value.copy(
+                            running = false,
+                            phase = com.bluewhale.agent.model.AgentPhase.TAKEOVER,
+                            awaitingTakeover = true,
+                            status = "$message；虚拟屏仍保留，可重试或取消",
+                        ),
                     )
                 }
-            val message =
-                when (result) {
-                    is com.bluewhale.agent.model.ActionResult.Success -> result.message
-                    is com.bluewhale.agent.model.ActionResult.Failure -> result.message
-                }
-            if (result is com.bluewhale.agent.model.ActionResult.Success) {
-                ConversationStore.appendAssistant(message, ConversationKind.TASK)
-                updateRunState(
-                    state.value.copy(
-                        running = false,
-                        awaitingTakeover = false,
-                        status = message,
-                    ),
-                )
-                platform.stop()
-                setPreview(null)
-                stopForeground(android.app.Service.STOP_FOREGROUND_DETACH)
-                publishIdleNotification(message)
-            } else {
-                ConversationStore.appendAssistant(message, ConversationKind.ERROR)
-                pendingTakeoverPlatform = platform
-                updateRunState(
-                    state.value.copy(
-                        running = false,
-                        awaitingTakeover = true,
-                        status = "$message；虚拟屏仍保留，可重试或取消",
-                    ),
-                )
+            } finally {
+                takeoverRequestActive = false
             }
         }
     }
 
     private fun cancelTakeover() {
+        if (takeoverRequestActive) return
         if (pendingTakeoverPlatform == null) {
             publishIdleNotification("没有等待接管的虚拟屏任务")
             return
         }
+        takeoverRequestActive = true
         scope.launch {
-            releasePendingTakeover()
-            val message = "已取消人工接管并关闭虚拟屏任务"
-            ConversationStore.appendAssistant(message, ConversationKind.TASK)
-            updateRunState(
-                state.value.copy(
-                    running = false,
-                    awaitingTakeover = false,
-                    status = message,
-                ),
-            )
-            stopForeground(android.app.Service.STOP_FOREGROUND_DETACH)
-            publishIdleNotification(message)
+            try {
+                releasePendingTakeover()
+                val message = "已取消人工接管并关闭虚拟屏任务"
+                ConversationStore.appendAssistant(message, ConversationKind.TASK)
+                updateRunState(
+                    state.value.copy(
+                        running = false,
+                        phase = com.bluewhale.agent.model.AgentPhase.COMPLETE,
+                        awaitingTakeover = false,
+                        status = message,
+                    ),
+                )
+                stopForeground(android.app.Service.STOP_FOREGROUND_DETACH)
+                publishIdleNotification(message)
+            } finally {
+                takeoverRequestActive = false
+            }
         }
     }
     private fun stopTaskRun() {
         cancelCurrentRun()
         pendingStart = null
-        state.value = state.value.copy(running = false, status = "已停止")
+        ConversationStore.appendAssistant("已终止任务", ConversationKind.TASK)
+        state.value =
+            state.value.copy(
+                running = false,
+                phase = com.bluewhale.agent.model.AgentPhase.COMPLETE,
+                awaitingTakeover = false,
+                status = "已终止任务",
+            )
         stopForeground(android.app.Service.STOP_FOREGROUND_DETACH)
-        publishIdleNotification("任务已停止")
+        publishIdleNotification("已终止任务")
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) = Unit
@@ -601,6 +649,15 @@ class AgentService : AccessibilityService() {
             )
         channel.description = "实时显示 Umbra Agent 的任务阶段、动作步数和最近日志"
         getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
+
+        val takeoverChannel =
+            NotificationChannel(
+                TAKEOVER_CHANNEL_ID,
+                "Umbra 人工接管请求",
+                NotificationManager.IMPORTANCE_HIGH,
+            )
+        takeoverChannel.description = "任务需要你确认是否从虚拟屏迁移到主屏"
+        getSystemService(NotificationManager::class.java).createNotificationChannel(takeoverChannel)
     }
 
     private fun updateRunState(next: AgentRunState) {
@@ -709,18 +766,37 @@ class AgentService : AccessibilityService() {
             } else {
                 text
             }
+        val awaitingTakeover = runState?.awaitingTakeover == true
+        val notificationChannelId =
+            if (awaitingTakeover) TAKEOVER_CHANNEL_ID else CHANNEL_ID
         val builder =
-            NotificationCompat.Builder(this, CHANNEL_ID)
+            NotificationCompat.Builder(this, notificationChannelId)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentTitle("Umbra phone-agent")
             .setContentText(compactText)
             .setStyle(NotificationCompat.BigTextStyle().bigText(detailText))
             .setSubText(runState?.mode?.label ?: "点击输入命令")
             .setContentIntent(contentIntent)
-            .setOngoing(true)
-            .setOnlyAlertOnce(true)
-            .setSilent(true)
-            .setCategory(NotificationCompat.CATEGORY_PROGRESS)
+            .setOngoing(!awaitingTakeover)
+            .setOnlyAlertOnce(!awaitingTakeover)
+            .setSilent(!awaitingTakeover)
+            .setAutoCancel(awaitingTakeover)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setFullScreenIntent(contentIntent, awaitingTakeover)
+            .setPriority(
+                if (awaitingTakeover) {
+                    NotificationCompat.PRIORITY_HIGH
+                } else {
+                    NotificationCompat.PRIORITY_DEFAULT
+                },
+            )
+            .setCategory(
+                if (awaitingTakeover) {
+                    NotificationCompat.CATEGORY_ALARM
+                } else {
+                    NotificationCompat.CATEGORY_PROGRESS
+                },
+            )
             .addAction(commandAction)
 
         if (runState?.awaitingTakeover == true) {

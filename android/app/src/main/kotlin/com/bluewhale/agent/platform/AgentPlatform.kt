@@ -26,6 +26,9 @@ interface AgentPlatform {
 
     suspend fun isTextInputFocused(): Boolean = false
 
+    /** Stops further virtual-display perception after a takeover request has been raised. */
+    suspend fun pauseForTakeover() = Unit
+
     /** Moves a retained virtual-screen task to the physical display after user approval. */
     suspend fun handoffToMainScreen(): ActionResult =
         ActionResult.Failure("当前执行屏幕不支持迁移接管")

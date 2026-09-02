@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "name": "umbra-smoke-v1",
+  "description": "A small, low-risk suite that checks main-screen system tools and virtual-display app launch.",
+  "defaults": {
+    "mode": "MAIN_SCREEN",
+    "max_steps": 8,
+    "timeout_seconds": 180,
+    "repetitions": 1
+  },
+  "tasks": [
+    {
+      "id": "main-open-settings",
+      "enabled": true,
+      "category": "system-tool",
+      "description": "Open Android system settings on the physical display.",
+      "instruction": "打开手机系统设置",
+      "mode": "MAIN_SCREEN",
+      "required_packages": ["com.android.settings"],
+      "oracle": {
+        "terminal_phases": ["COMPLETE"],
+        "package_regex": "^com\\.android\\.settings$",
+        "max_steps": 5,
+        "max_reflections": 1,
+        "max_failed_verifications": 1,
+        "manual": false
+      }
+    },
+    {
+      "id": "virtual-open-qq",
+      "enabled": true,
+      "category": "virtual-launch",
+      "description": "Launch QQ directly on the isolated virtual display.",
+      "instruction": "打开QQ",
+      "mode": "VIRTUAL_DISPLAY",
+      "required_packages": ["com.tencent.mobileqq"],
+      "oracle": {
+        "terminal_phases": ["COMPLETE"],
+        "required_actions": ["Launch"],
+        "package_regex": "^com\\.tencent\\.mobileqq$",
+        "max_steps": 5,
+        "max_reflections": 1,
+        "max_failed_verifications": 1,
+        "manual": false
+      }
+    },
+    {
+      "id": "main-navigation-preview",
+      "enabled": true,
+      "category": "system-tool",
+      "description": "Open a navigation preview without automatically starting navigation.",
+      "instruction": "帮我导航到无锡一中",
+      "mode": "MAIN_SCREEN",
+      "oracle": {
+        "terminal_phases": ["COMPLETE", "TAKEOVER"],
+        "required_actions": ["SystemTool"],
+        "required_system_tools": ["navigate"],
+        "max_steps": 4,
+        "max_reflections": 1,
+        "max_failed_verifications": 1,
+        "manual": true,
+        "manual_prompt": "地图是否已打开，并正确显示“无锡一中”的导航或路线预览？"
+      }
+    }
+  ]
+}

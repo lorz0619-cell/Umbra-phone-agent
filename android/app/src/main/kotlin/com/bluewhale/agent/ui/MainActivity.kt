@@ -537,29 +537,11 @@ private fun ChatScreen(
                 onModeChange = onModeChange,
             )
             if (runState.awaitingTakeover) {
-                Surface(
-                    color = MaterialTheme.colorScheme.errorContainer,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Column(
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        Text("任务等待人工接管", fontWeight = FontWeight.SemiBold)
-                        Text(
-                            runState.status,
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            OutlinedButton(onClick = { AgentService.cancelTakeover(context = context) }) {
-                                Text("取消")
-                            }
-                            OutlinedButton(onClick = { AgentService.approveTakeover(context = context) }) {
-                                Text("接管到主屏")
-                            }
-                        }
-                    }
-                }
+                TakeoverAlertDialog(
+                    status = runState.status,
+                    onApprove = { AgentService.approveTakeover(context = context) },
+                    onCancel = { AgentService.stopTask(context = context) },
+                )
             }
             LazyColumn(
                 state = listState,
@@ -588,6 +570,38 @@ private fun ChatScreen(
             }
         }
     }
+}
+
+@Composable
+private fun TakeoverAlertDialog(
+    status: String,
+    onApprove: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onCancel,
+        title = { Text("任务等待人工接管") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(status)
+                Text(
+                    "点击“接管到主屏”后，当前虚拟屏页面才会迁移到主屏；在此之前 Agent 已停止继续操作虚拟屏。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        },
+        confirmButton = {
+            OutlinedButton(onClick = onApprove) {
+                Text("接管到主屏")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onCancel) {
+                Text("取消")
+            }
+        },
+    )
 }
 
 @Composable
@@ -782,6 +796,22 @@ private fun SettingsScreen(
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            if (mode == TargetMode.VIRTUAL_DISPLAY && preview != null) {
+                item { SettingsSectionTitle("虚拟屏预览") }
+                item {
+                    Image(
+                        bitmap = preview.asImageBitmap(),
+                        contentDescription = "虚拟屏预览",
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .height(300.dp)
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(Color.Black),
+                        contentScale = ContentScale.Fit,
+                    )
+                }
+            }
             item { SettingsSectionTitle("运行环境") }
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -867,26 +897,15 @@ private fun SettingsScreen(
                 }
             }
 
-            if (mode == TargetMode.VIRTUAL_DISPLAY && preview != null) {
-                item { HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp)) }
-                item {
-                    SettingsSectionTitle("虚拟屏预览")
-                }
-                item {
-                    Image(
-                        bitmap = preview.asImageBitmap(),
-                        contentDescription = "虚拟屏预览",
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .height(300.dp)
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(Color.Black),
-                        contentScale = ContentScale.Fit,
-                    )
-                }
-            }
             item { Spacer(modifier = Modifier.height(20.dp)) }
+            item {
+                Text(
+                    text = "版本号：${BuildConfig.VERSION_NAME}",
+                    modifier = Modifier.fillMaxWidth(),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
         }
     }
 }

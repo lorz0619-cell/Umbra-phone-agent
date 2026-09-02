@@ -41,7 +41,7 @@ class SubtaskScopePolicyTest {
     }
 
     @Test
-    fun `five recovery reflections remain executable`() {
+    fun `three recovery reflections remain executable`() {
         for (count in 0..SubtaskScopePolicy.MAX_RECOVERY_ATTEMPTS) {
             assertFalse(
                 "reflection count $count should not enter terminal adjudication",
@@ -51,7 +51,7 @@ class SubtaskScopePolicyTest {
     }
 
     @Test
-    fun `sixth reflection asks terminal adjudicator`() {
+    fun `fourth reflection asks terminal adjudicator`() {
         assertTrue(
             SubtaskScopePolicy.shouldTerminalAdjudicate(
                 SubtaskScopePolicy.MAX_RECOVERY_ATTEMPTS + 1,

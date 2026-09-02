@@ -52,6 +52,7 @@ class OpenAiCompatibleVlmClient(
         evidence: String,
         correction: String,
         blockedActions: Set<String>,
+        candidateHints: List<String>,
     ): AgentDecision =
         requestDecision(
             task = task,
@@ -63,6 +64,8 @@ class OpenAiCompatibleVlmClient(
                     appendLine("触发原因：$trigger")
                     appendLine("失败证据：$evidence")
                     appendLine("纠错要求：$correction")
+                    appendLine("可选候选路径：")
+                    candidateHints.forEach { appendLine("- $it") }
                     appendLine("禁止的精确页面-动作：")
                     blockedActions.forEach { appendLine("- ${it.substringAfter('|')}") }
                     append("必须根据最新截图提出可执行的新假设；不能只改参数格式。")
@@ -675,12 +678,14 @@ class OpenAiCompatibleVlmClient(
             1a. 若用户目标可由 navigate、set_alarm、set_timer、create_calendar_event、create_contact、compose_sms、dial_phone、open_camera、open_url、web_search、open_system_settings、compose_email、share_text 或 play_media 完成，必须优先调用对应系统工具，不要退化为 Launch + 截图点击。
             1b. 系统工具是固定白名单：不得构造任意 Intent。短信、电话、日历、联系人、邮件、分享、相机和导航只负责打开预填或确认界面；禁止声称已经发送、拨出、保存、拍摄或开始导航。
             1c. 每个动作必须填写稳定的 subtask ID，表示当前中间目标，例如 launch_taobao、submit_search、select_product、confirm_order。在截图明确证明该中间目标完成前，subtask 必须逐字保持不变；禁止通过改名绕过反思次数。
+            1d. 动作执行成功不等于当前 subtask 已推进。Wait、输入、点击聚焦等动作即使执行成功，只要页面没有产生包名、语义树或显著视觉推进，仍必须按未推进处理。
             2. 先确认当前应用和页面，再行动。输入框已经可见时，应直接调用带 element_index 或 target_box 的 Type，由执行器定向写入；不要为了“聚焦”机械地先 Tap。
             2a. 用户明确要求打开或启动某个应用时，优先调用 launch；只有 launch 明确失败后才使用桌面搜索。
             3. 不得假定动作成功；下一轮会提供 Kotlin 后置验证结果。
-            4. 验证失败时换一种可解释的策略，不要机械重复同一坐标。
+            4. 验证失败或动作成功但 subtask 未推进时，换一种可解释的策略，不要机械重复同一坐标。
             4a. 每个动作必须填写 reason 和 expected_outcome：只写可观察依据、决策理由和预期验证信号，不输出冗长思维过程。
             4b. 出现 [REFLECTION] 反馈时，它具有最高优先级；必须避开被禁止的页面-动作组合，并明确选择不同策略。
+            4c. 同一 subtask 最多进行 3 次普通反思恢复；第 4 次会进入终局裁决，只允许 take_over 或 complete_task。
             5. 页面仍在加载时调用 wait；登录、验证码、支付、敏感确认调用 take_over。
             5a. 创建闹钟/计时器前必须有明确时间或时长；日历时间使用当前本地时间推导，并输出带时区 ISO-8601。信息不足时先在对话层向用户追问，不能猜测关键参数。
             6. 只有当前观察已明确证明目标完成时调用 complete_task。
@@ -701,6 +706,8 @@ class OpenAiCompatibleVlmClient(
             1. 比较失败前后的证据，判断更可能是定位错误、焦点不可观察、页面未稳定、遮挡、滚动位置错误，还是动作已经生效但验证信号不足。
             2. 只调用一个工具提出可执行的新假设，并填写 failure_cause、strategy_change、reason、expected_outcome。
             2a. 反思恢复必须沿用最近历史中的同一个 subtask ID，直到截图证明该子任务已完成；不能新建或改名来重置恢复预算。
+            2b. 动作执行成功不等于子任务推进：只有包名、语义树或显著视觉状态向前变化，才允许切换到下一个 subtask。
+            2c. 当 trigger 为 repeated_wait、repeated_tap_coordinate 或 repeated_type_failure 时，必须把刚刚重复的路径视为已失效并降低其权重；repeated_tap_coordinate 应继续 Tap，但必须换成不同坐标/节点，repeated_wait 应停止单纯等待，repeated_type_failure 应切换输入焦点或策略。
             3. 新策略必须发生实质变化：优先直接 Type 到输入节点/输入框、改用 element_index、改用明显不同的视觉区域、Wait 后重感知、Swipe 暴露目标、Back 恢复页面或 Take_over。
             4. 如果输入框已经可见，优先使用带目标定位的 Type，不要再次 Tap 输入框来证明焦点。
             5. 不能把“补上 target_box”、改写 target_description 或对相同边界做微小偏移冒充新策略。
@@ -708,6 +715,7 @@ class OpenAiCompatibleVlmClient(
             7. 不得假定动作成功；只描述可观察的验证信号。每轮只能调用一个已注册工具。
             8. 只有最新截图明确证明任务完成时才 complete_task。
             9. 坐标和边界均使用 0..999 归一化坐标。
+            10. 同一 subtask 最多进行 3 次普通恢复；如果仍不能证明推进，则接受进入终局裁决，不要靠微小偏移或改名拖延。
             """.trimIndent()
 
         val TERMINAL_SYSTEM_PROMPT =

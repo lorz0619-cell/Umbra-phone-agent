@@ -13,7 +13,7 @@ data class SubtaskScopeResolution(
  * accepted only after the graph has made verified progress (or when the first scope is created).
  */
 object SubtaskScopePolicy {
-    const val MAX_RECOVERY_ATTEMPTS = 5
+    const val MAX_RECOVERY_ATTEMPTS = 3
 
     fun resolve(
         currentLabel: String,

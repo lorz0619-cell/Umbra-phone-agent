@@ -1,13 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest
-    xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools">
-    <application
-        android:usesCleartextTraffic="true"
-        tools:replace="android:usesCleartextTraffic">
-
-        <!-- Debug-only ADB benchmark bridge. android.permission.DUMP is held by shell/system,
-             not ordinary third-party applications. It is absent from release builds. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <!-- Shell-only bridge for local device evaluation. Never included in release builds. -->
         <receiver
             android:name=".benchmark.BenchmarkCommandReceiver"
             android:exported="true"

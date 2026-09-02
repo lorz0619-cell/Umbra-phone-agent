@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "name": "benchtask-supplement-v1",
+  "description": "Supplemental single-run tasks: NetEase search plus file lookup on main and virtual display.",
+  "defaults": {
+    "mode": "MAIN_SCREEN",
+    "max_steps": 20,
+    "timeout_seconds": 300,
+    "repetitions": 1
+  },
+  "tasks": [
+    {
+      "id": "supp-netease-search-main",
+      "enabled": true,
+      "category": "music",
+      "instruction": "在网易云音乐中搜索歌曲 loveme",
+      "mode": "MAIN_SCREEN",
+      "max_steps": 20,
+      "timeout_seconds": 300,
+      "repetitions": 1,
+      "required_packages": ["com.netease.cloudmusic"],
+      "notes": "补充测试：只要求最终搜索结果页面正确。",
+      "oracle": {
+        "terminal_phases": ["COMPLETE", "TAKEOVER"],
+        "max_steps": 20,
+        "max_reflections": 4,
+        "max_failed_verifications": 4,
+        "manual": true,
+        "manual_prompt": "网易云音乐是否已打开并显示 loveme 的正确搜索结果？"
+      }
+    },
+    {
+      "id": "supp-file-main",
+      "enabled": true,
+      "category": "file",
+      "instruction": "在手机文件里找到 Download 中的 umbra-benchmark.txt",
+      "mode": "MAIN_SCREEN",
+      "max_steps": 15,
+      "timeout_seconds": 240,
+      "repetitions": 1,
+      "notes": "补充测试：已预置 /sdcard/Download/umbra-benchmark.txt。",
+      "oracle": {
+        "terminal_phases": ["COMPLETE", "TAKEOVER"],
+        "max_steps": 15,
+        "max_reflections": 3,
+        "max_failed_verifications": 3,
+        "manual": true,
+        "manual_prompt": "是否在手机文件管理器中找到了 Download 下的 umbra-benchmark.txt？"
+      }
+    },
+    {
+      "id": "supp-file-virtual",
+      "enabled": true,
+      "category": "file",
+      "instruction": "在手机文件里找到 Download 中的 umbra-benchmark.txt",
+      "mode": "VIRTUAL_DISPLAY",
+      "max_steps": 15,
+      "timeout_seconds": 300,
+      "repetitions": 1,
+      "notes": "补充测试：虚拟屏文件查找，接管后人工确认。",
+      "oracle": {
+        "terminal_phases": ["COMPLETE", "TAKEOVER"],
+        "max_steps": 15,
+        "max_reflections": 3,
+        "max_failed_verifications": 3,
+        "manual": true,
+        "manual_prompt": "接管到主屏后，是否找到了 Download 下的 umbra-benchmark.txt？"
+      }
+    }
+  ]
+}

@@ -33,8 +33,8 @@ android {
         applicationId = "com.bluewhale.agent"
         minSdk = 31
         targetSdk = 35
-        versionCode = 14
-        versionName = "2.0.0"
+        versionCode = 15
+        versionName = "2.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -67,7 +67,19 @@ android {
                 "proguard-rules.pro",
             )
         }
+        create("benchmark") {
+            initWith(getByName("debug"))
+            // Benchmark builds use the API key already stored in app-private preferences.
+            buildConfigField("String", "DEFAULT_API_KEY", "\"\"")
+            matchingFallbacks += listOf("debug")
+            if (releaseSigningConfigured) {
+                // Preserve app data when temporarily replacing a locally installed release build.
+                signingConfig = signingConfigs.getByName("release")
+            }
+        }
     }
+
+    sourceSets.getByName("benchmark").java.srcDir("src/debug/kotlin")
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

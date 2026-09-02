@@ -4,6 +4,7 @@ __pycache__/
 .env
 config/.env
 artifacts/
+benchmark-results/
 .tmp/
 .release-secrets/
 agent-log-*.txt
@@ -31,3 +32,5 @@ android/app/release/
 tools/scrcpy/
 tools/*.zip
 tools/*.apk
+benchmarks/benchtask.xlsx
+benchmarks/benchtask_reviewed.xlsx
