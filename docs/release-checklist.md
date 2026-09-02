@@ -22,7 +22,7 @@
 
 - Signed universal APK.
 - SHA-256 checksum file.
-- Release notes from `docs/releases/v2.0.0.md`.
+- Version-specific release notes from `docs/releases/<version>.md`.
 
 The unsigned Gradle APK is a build intermediate and must not be offered as the installable asset.
 Future updates must use the same signing key.
