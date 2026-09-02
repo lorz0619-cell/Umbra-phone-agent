@@ -59,7 +59,7 @@ flowchart TB
     style CORE fill:#ffffff,stroke:#000000,color:#000000,stroke-width:1px
     style EXECUTION fill:#ffffff,stroke:#000000,color:#000000,stroke-width:1px
     style ANDROID fill:#ffffff,stroke:#000000,color:#000000,stroke-width:1px
-    linkStyle default stroke:#000000,stroke-width:1.5px,color:#000000;
+    linkStyle default stroke:#000000,stroke-width:1.5px;
 ```
 
 ### Agent architecture
@@ -98,7 +98,7 @@ flowchart TB
     style MAIN fill:#ffffff,stroke:#000000,color:#000000,stroke-width:1px
     style RECOVERY fill:#ffffff,stroke:#000000,color:#000000,stroke-width:1px
     style TERMINAL fill:#ffffff,stroke:#000000,color:#000000,stroke-width:1px
-    linkStyle default stroke:#000000,stroke-width:1.5px,color:#000000;
+    linkStyle default stroke:#000000,stroke-width:1.5px;
 ```
 
 核心能力：
