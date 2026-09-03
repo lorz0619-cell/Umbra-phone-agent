@@ -6,99 +6,95 @@ Android App 使用 Kotlin StateGraph 编排通用 OpenAI-compatible 多模态模
 
 ## Architecture
 
-### Project architecture
+### 分层架构
 
 ```mermaid
-%%{init: {"theme":"base","themeVariables":{"primaryColor":"#ffffff","primaryTextColor":"#000000","primaryBorderColor":"#000000","lineColor":"#000000","secondaryColor":"#ffffff","tertiaryColor":"#ffffff","edgeLabelBackground":"#ffffff","clusterBkg":"#ffffff","clusterBorder":"#000000"},"flowchart":{"curve":"stepAfter","nodeSpacing":54,"rankSpacing":58,"htmlLabels":true}}}%%
 flowchart TB
-    subgraph INTERACTION["交互层"]
-        direction LR
-        UI["Compose 对话主界面"] ~~~ NV["通知栏与语音入口"] ~~~ BM["ADB 日志与 Benchmark"]
+    UI["Compose UI<br/>持久多轮对话 / 设置"] --> Timeline[("追加式会话时间线<br/>SharedPreferences")]
+    UI --> Router{"Conversation Router<br/>无工具调用"}
+    Timeline --> Router
+    Router -->|普通聊天| Timeline
+    Router -->|明确的手机任务| Service["AgentService<br/>生命周期与状态流"]
+    Service -->|最终总结 / 报错| Timeline
+    Service --> Graph["AgentGraph<br/>Kotlin 共享状态 + 显式边"]
+    Service --> Notice["常驻通知控制<br/>状态 / 文字与语音命令 / 停止 / 接管"]
+    Notice --> Voice["Vosk 离线中文语音<br/>首次下载模型 / 本地识别"]
+    Voice --> Router
+
+    subgraph Runtime["Agent Graph Runtime"]
+        P["Perception Node<br/>截图 + 无障碍树 + 包名 + 输入焦点"]
+        B["Bootstrap Node<br/>明确应用请求优先 Launch"]
+        L["Planning Node<br/>通用 VLM function calling"]
+        V["Validation Node<br/>工具白名单 / 参数 / 坐标 / 风险分级"]
+        E["Execution Node<br/>强类型 DeviceAction"]
+        C["Verification Node<br/>变化 / 输入 / 前台校验"]
+        R{"Routing Node<br/>成功 / 重规划 / 熔断 / 结束"}
+        F["Reflection Guard<br/>失败证据 / 循环检测 / 副作用去重"]
+        RP["Reflection Perception<br/>强制刷新截图与语义树"]
+        RL["Recovery Planner<br/>失败归因 + 实质策略变化"]
+        TA["Terminal Adjudicator<br/>Take_over 或明确终止"]
+        P --> B
+        B -->|无本地启动动作| L --> V --> E --> C --> R
+        B -->|本地匹配到已安装应用| V
+        R -->|继续| L
+        R -->|需要新快照| P
+        R -->|卡死或语义循环| F
+        F --> RP --> RL --> V
+        RL -->|持续无法恢复| TA
+        TA -->|人工仍可继续| HOLD["保留虚拟屏 / 等待确认"]
+        TA -->|接管无意义| END([END])
+        R -->|完成| END
     end
 
-    subgraph APPLICATION["应用编排层"]
-        direction LR
-        CR["Conversation Router"] ~~~ AS["AgentService 生命周期"] ~~~ OM["会话记忆与可观测性"]
-    end
+    Graph --> P
+    L <-->|普通规划：非思考 + 强制 function call| Provider[("任意兼容 VLM Provider")]
+    RL <-->|专用反思提示 + 失败原因 / 策略变化| Provider
+    Router <-->|JSON 聊天 / 意图路由| Provider
 
-    subgraph CORE["Agent 核心层"]
-        direction LR
-        PE["多模态感知引擎"] --> SG["Kotlin StateGraph"] --> VR["验证与反思引擎"]
-    end
-
-    subgraph EXECUTION["能力执行层"]
-        direction LR
-        MP["主屏执行平台"] ~~~ VP["虚拟屏执行平台"] ~~~ ST["系统能力工具"]
-    end
-
-    subgraph ANDROID["Android 集成层"]
-        direction LR
-        AX["无障碍与截图"] ~~~ SZ["Shizuku 与隐藏 API"] ~~~ II["Intent 与静默输入"]
-    end
-
-    UI --> CR
-    NV --> AS
-    BM --> OM
-    CR --> AS
-    AS --> OM
-    AS --> SG
-    OM --> SG
-    VR --> SG
-    SG --> MP
-    SG --> VP
-    SG --> ST
-    PE --> AX
-    MP --> AX
-    VP --> SZ
-    ST --> II
-
-    classDef box fill:#ffffff,stroke:#000000,color:#000000,stroke-width:1.5px;
-    class UI,NV,BM,CR,AS,OM,PE,SG,VR,MP,VP,ST,AX,SZ,II box;
-    style INTERACTION fill:#ffffff,stroke:#000000,color:#000000,stroke-width:1px
-    style APPLICATION fill:#ffffff,stroke:#000000,color:#000000,stroke-width:1px
-    style CORE fill:#ffffff,stroke:#000000,color:#000000,stroke-width:1px
-    style EXECUTION fill:#ffffff,stroke:#000000,color:#000000,stroke-width:1px
-    style ANDROID fill:#ffffff,stroke:#000000,color:#000000,stroke-width:1px
-    linkStyle default stroke:#000000,stroke-width:1.5px;
+    E --> Dispatch{"动作类型"}
+    Dispatch -->|视觉动作| Platform{"AgentPlatform"}
+    Dispatch -->|低 / 中风险系统工具| Intent["SystemCapabilityExecutor<br/>固定 Android Intent 白名单"]
+    Intent --> Platform
+    P --> Platform
+    Platform --> Main["主屏<br/>AccessibilityService"]
+    Platform --> Virtual["虚拟屏<br/>Shizuku + ImageReader"]
+    Virtual -.隔离边界保持不变.-> MainScreen[("用户主屏继续使用")]
+    HOLD -->|用户允许| Move["Shizuku moveRootTaskToDisplay<br/>现有任务迁移到主屏"]
+    Move --> MainScreen
 ```
 
-### Agent architecture
+### Agent 状态机
 
 ```mermaid
-%%{init: {"theme":"base","themeVariables":{"primaryColor":"#ffffff","primaryTextColor":"#000000","primaryBorderColor":"#000000","lineColor":"#000000","secondaryColor":"#ffffff","tertiaryColor":"#ffffff","edgeLabelBackground":"#ffffff","clusterBkg":"#ffffff","clusterBorder":"#000000"},"flowchart":{"curve":"stepAfter","nodeSpacing":46,"rankSpacing":62,"htmlLabels":true}}}%%
-flowchart TB
-    subgraph MAIN["主执行路径"]
-        direction LR
-        P["Perceive<br/>截图 + 无障碍树"] --> PL["Plan<br/>结构化动作"] --> VA["Validate<br/>动作前置校验"] --> EX["Execute<br/>平台执行"] --> VE["Verify<br/>结果与进度校验"] --> RO["Route<br/>状态路由"]
-    end
-
-    subgraph RECOVERY["反思恢复路径"]
-        direction LR
-        TD["触发检测<br/>失败 · 重复 · 循环"] --> RF["Reflect<br/>子任务反思回合"] --> FP["Fresh Perceive<br/>刷新现场证据"] --> RP["Recovery Plan<br/>生成候选策略"] --> NG["Novelty Gate<br/>差异性校验"] ~~~ TA["Terminal Judge<br/>终止裁决"]
-    end
-
-    subgraph TERMINAL["终态"]
-        direction LR
-        CO["Complete<br/>返回任务总结"] ~~~ TO["Take over<br/>请求用户接管"] ~~~ FA["Failed<br/>返回可诊断错误"]
-    end
-
-    RO -->|继续推进| P
-    RO -->|失败、重复或循环| TD
-    RO -->|目标完成| CO
-    RO -->|需要人工操作| TO
-    NG -->|候选有效| VA
-    NG -->|候选重复| RF
-    RF -->|反思预算耗尽| TA
-    TA -->|任务已经完成| CO
-    TA -->|用户可以处理| TO
-    TA -->|不可恢复| FA
-
-    classDef box fill:#ffffff,stroke:#000000,color:#000000,stroke-width:1.5px;
-    class P,PL,VA,EX,VE,RO,TD,RF,FP,RP,NG,TA,CO,TO,FA box;
-    style MAIN fill:#ffffff,stroke:#000000,color:#000000,stroke-width:1px
-    style RECOVERY fill:#ffffff,stroke:#000000,color:#000000,stroke-width:1px
-    style TERMINAL fill:#ffffff,stroke:#000000,color:#000000,stroke-width:1px
-    linkStyle default stroke:#000000,stroke-width:1.5px;
+stateDiagram-v2
+    [*] --> Perceive
+    Perceive --> Plan: 获得截图与无障碍树
+    Perceive --> Perceive: 短暂截图重试
+    Perceive --> Failed: 重试耗尽且无降级帧
+    Plan --> Validate: 恰好一个动作工具
+    Plan --> Complete: complete_task
+    Plan --> Route: 工具调用缺失或非法
+    Validate --> Execute: 类型化动作合法
+    Validate --> Route: 参数或坐标失败
+    Execute --> Verify: 执行器返回结果
+    Verify --> Route: 后置观察完成
+    Route --> Plan: 已验证或可重试失败
+    Route --> Reflect: 连续失败或 A-B 循环
+    Validate --> Reflect: 阻止重复或重复发送
+    Reflect --> Perceive: 固化证据与禁止动作
+    Perceive --> Replan: 取得反思新快照
+    Replan --> Validate: 实质不同的恢复动作
+    Replan --> Reflect: 仍提出相同禁止动作
+    Replan --> Adjudicate: 恢复多次被拒绝
+    Adjudicate --> TakeOver: 人工可继续
+    Adjudicate --> Failed: 接管无意义
+    Route --> Perceive: 观察缺失
+    Route --> TakeOver: 请求接管
+    Route --> Reflect: 动作失败或无进展预算
+    Route --> Failed: 协议失败或最大步数安全边界
+    Complete --> [*]
+    TakeOver --> [*]
+    Failed --> [*]
 ```
 
 核心能力：
