@@ -24,7 +24,7 @@ Android App 使用 Kotlin 编排，配合多模态模型，可以涵盖日常生
 - 子任务级反思、重复动作检测、候选路径重规划和终局裁决
 - 虚拟屏统一接管确认、顶部接管通知、离线中文语音
 
-项目架构详细说明见[详细说明](docs/architecture-v2.md) ，
+项目架构详细说明见[详细说明](docs/architecture-v2.md) 
 
 ## Deploy
 
