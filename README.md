@@ -106,6 +106,7 @@ stateDiagram-v2
 - 后置视觉、语义树、包名和输入验证
 - 子任务级反思、重复动作检测、候选路径重规划和终局裁决
 - 虚拟屏统一接管确认、顶部接管通知、离线中文语音
+
 完整说明见 [benchmarks/README.md](benchmarks/README.md)，
 
 ## Deploy
